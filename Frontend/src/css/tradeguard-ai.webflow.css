@@ -2997,6 +2997,7 @@ figcaption {
   border: 1px solid var(--border-color--border-primary);
   background-color: var(--base-color-neutral--white);
   border-radius: .75rem;
+  overflow: hidden !important;
 }
 
 .card_app_wrapper.is-small {
@@ -3019,12 +3020,14 @@ figcaption {
   line-height: 1;
 }
 
+/* 
 .card_app_chart_wrapper {
   padding: 1.25rem;
-}
+} */
 
 .card_main_crypto_icon {
   max-width: 1.5rem;
+  border-radius: 100%;
 }
 
 .main_app_nav_container {
@@ -4212,10 +4215,6 @@ figcaption {
     flex-flow: column;
     grid-auto-columns: 1fr;
     display: flex;
-  }
-
-  .card_app_wrapper {
-    overflow: hidden;
   }
 
   .main_app_nav_container {

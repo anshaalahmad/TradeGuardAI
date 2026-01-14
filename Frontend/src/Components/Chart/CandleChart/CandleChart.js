@@ -7,12 +7,12 @@ const { createChart } = LightweightCharts
  * run independently and be imported by the React component.
  *
  * Usage:
- *   import { initCandleChart } from './CandleChart'
- *   const destroy = initCandleChart(chartContainerEl, priceEl, { symbol, interval, pageLimit, height })
+ *   import { initBinanceCandleChart } from './CandleChart'
+ *   const destroy = initBinanceCandleChart(chartContainerEl, priceEl, { symbol, interval, pageLimit, height })
  *   // when unmounting call destroy()
  */
 
-export function initCandleChart(containerEl, priceEl, opts = {}) {
+export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
     const SYMBOL = (opts.symbol || 'BTCUSDT').toUpperCase()
     const SYMBOLLOWER = SYMBOL.toLowerCase()
     const INTERVAL = opts.interval || '1m'
@@ -30,18 +30,97 @@ export function initCandleChart(containerEl, priceEl, opts = {}) {
         width: containerEl.clientWidth,
         height,
         layout: {
-            background: { color: '#121212ff' },
-            textColor: 'white',
+            background: { color: 'white' },
+            textColor: 'black',
         },
         timeScale: {
             timeVisible: true,
             secondsVisible: false,
         },
         grid: {
-            vertLines: { color: 'rgba(255,255,255,0.1)' },
-            horzLines: { color: 'rgba(255,255,255,0.1)' },
+            vertLines: { color: '#ccc' },
+            horzLines: { color: '#ccc' },
         },
     })
+
+    // Setting the border color for the vertical axis (use explicit scale id)
+    chart.priceScale('right').applyOptions({
+        borderColor: '#ccc',
+    });
+
+    // Setting the border color for the horizontal axis
+    chart.timeScale().applyOptions({
+        borderColor: '#ccc',
+    });
+
+    // Create an area series first (will appear beneath the candlesticks)
+    let areaSeries
+    try {
+        if (LightweightCharts?.AreaSeries) {
+            areaSeries = chart.addSeries(LightweightCharts.AreaSeries, {
+                lastValueVisible: false, // hide the last value marker for this series
+                crosshairMarkerVisible: false, // hide the crosshair marker for this series
+                lineColor: 'transparent', // hide the line
+                topColor: 'rgb(30 101 250)',
+                bottomColor: 'rgba(255, 255, 255, 0)',
+            })
+        } else if (typeof chart.addAreaSeries === 'function') {
+            areaSeries = chart.addAreaSeries({
+                lastValueVisible: false,
+                crosshairMarkerVisible: false,
+                lineColor: 'transparent',
+                topColor: 'rgb(30 101 250)',
+                bottomColor: 'rgba(255, 255, 255, 0)',
+            })
+        }
+    } catch (err) {
+        console.warn('Could not create area series:', err)
+    }
+
+    // Helper function to calculate moving average from candlestick data
+    function calculateMovingAverageSeriesData(candleData, maLength) {
+        const maData = []
+
+        for (let i = 0; i < candleData.length; i++) {
+            if (i < maLength) {
+                // Provide whitespace data points until the MA can be calculated
+                maData.push({ time: candleData[i].time })
+            } else {
+                // Calculate the moving average
+                let sum = 0
+                for (let j = 0; j < maLength; j++) {
+                    sum += candleData[i - j].close
+                }
+                const maValue = sum / maLength
+                maData.push({ time: candleData[i].time, value: maValue })
+            }
+        }
+
+        return maData
+    }
+
+    // Create a moving average line series
+    const MA_LENGTH = opts.maLength || 20
+    let maSeries
+    try {
+        if (LightweightCharts?.LineSeries) {
+            maSeries = chart.addSeries(LightweightCharts.LineSeries, {
+                color: '#1e65fa',
+                lineWidth: 2,
+                lastValueVisible: true,
+                priceLineVisible: false,
+            })
+        } else if (typeof chart.addLineSeries === 'function') {
+            maSeries = chart.addLineSeries({
+                color: '#1e65fa',
+                lineWidth: 2,
+                lastValueVisible: true,
+                priceLineVisible: false,
+            })
+        }
+    } catch (err) {
+        console.warn('Could not create moving average series:', err)
+    }
 
     // Create a candlestick series. Different library versions expose
     // different helpers: prefer addCandlestickSeries, otherwise fall back
@@ -105,6 +184,25 @@ export function initCandleChart(containerEl, priceEl, opts = {}) {
             const initial = Array.isArray(json) ? json.map(klineArrayToPoint) : []
             if (!initial.length) return
             candles = initial
+            
+            // Convert candlestick data for area series
+            const lineData = candles.map(datapoint => ({
+                time: datapoint.time,
+                value: (datapoint.close + datapoint.open) / 2,
+            }))
+            
+            // Set data for area series if it exists
+            if (areaSeries) {
+                areaSeries.setData(lineData)
+            }
+            
+            // Calculate and set moving average data
+            if (maSeries) {
+                const maData = calculateMovingAverageSeriesData(candles, MA_LENGTH)
+                maSeries.setData(maData)
+            }
+            
+            // Set data for candlestick series
             candleSeries.setData(candles)
             chart.timeScale().fitContent()
             const last = candles[candles.length - 1]
@@ -117,47 +215,237 @@ export function initCandleChart(containerEl, priceEl, opts = {}) {
         }
     }
 
-    // Connect Binance websocket for real-time kline updates
-    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${SYMBOLLOWER}@kline_${INTERVAL}`)
+    // WebSocket with reconnect/backoff logic for real-time kline updates
+    let ws = null
+    let reconnectAttempts = 0
+    let reconnectTimer = null
+    let destroyed = false
+    let pollingTimer = null
+    const POLLING_INTERVAL = opts.pollingIntervalMs || 5000
+    const POLL_AFTER_ATTEMPTS = 3
+    let connectTimer = null
 
-    // When we receive a websocket kline message, update the chart
-    ws.onmessage = function (event) {
-    try {
-        const payload = JSON.parse(event.data);
-        // payload.k is the kline object
-        const k = payload.k;
-        const point = {
-            time: Math.floor(k.t / 1000),
-            open: parseFloat(k.o),
-            high: parseFloat(k.h),
-            low: parseFloat(k.l),
-            close: parseFloat(k.c)
-        };
+    function handleWsMessage(event) {
+        try {
+            const payload = JSON.parse(event.data)
+            // Stream endpoint wraps data in a 'data' field with 'stream' name
+            const eventData = payload.data || payload
+            const k = eventData.k
+            if (!k) {
+                console.warn('Received message without kline data:', payload)
+                return
+            }
+            const point = {
+                time: Math.floor(k.t / 1000),
+                open: parseFloat(k.o),
+                high: parseFloat(k.h),
+                low: parseFloat(k.l),
+                close: parseFloat(k.c),
+            }
 
-        // update the series: update() will append or replace the last point as needed
-        candleSeries.update(point);
+            // update the series and local cache
+            candleSeries.update(point)
+            
+            // Update area series with the average of open and close
+            if (areaSeries) {
+                const areaPoint = {
+                    time: point.time,
+                    value: (point.close + point.open) / 2,
+                }
+                areaSeries.update(areaPoint)
+            }
+            
+            if (candles.length && candles[candles.length - 1].time === point.time) {
+                candles[candles.length - 1] = point
+            } else {
+                candles.push(point)
+            }
 
-        // keep the local candles array in sync (replace last point if same time or append)
-        if (candles.length && candles[candles.length - 1].time === point.time) {
-            candles[candles.length - 1] = point;
-        } else {
-            candles.push(point);
+            // Update moving average
+            if (maSeries && candles.length >= MA_LENGTH) {
+                // Calculate MA for the latest point
+                let sum = 0
+                for (let j = 0; j < MA_LENGTH; j++) {
+                    sum += candles[candles.length - 1 - j].close
+                }
+                const maValue = sum / MA_LENGTH
+                maSeries.update({ time: point.time, value: maValue })
+            }
+
+            if (priceEl) {
+                priceEl.innerText = '$' + point.close.toFixed(4)
+                try {
+                    priceEl.style.color = !lastprice || lastprice === point.close ? 'black' : point.close > lastprice ? 'green' : 'red'
+                } catch (err) {}
+            }
+            lastprice = point.close
+        } catch (e) {
+            console.error('ws message parse error', e)
         }
+    }
 
-                // update textual price display using the latest close
-                if (priceEl) {
-                    priceEl.innerText = '$' + point.close.toFixed(4)
-                    try {
-                        priceEl.style.color = !lastprice || lastprice === point.close ? 'white' : point.close > lastprice ? 'green' : 'red'
-                    } catch (err) {
-                        // ignore styling errors
+    // Poll REST API as a fallback when WS repeatedly fails
+    function startPolling() {
+        if (pollingTimer || destroyed) return
+        console.warn(`🔄 Starting REST polling fallback every ${POLLING_INTERVAL}ms`)
+        pollingTimer = setInterval(async () => {
+            try {
+                const url = `https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=${INTERVAL}&limit=2`
+                const r = await fetch(url)
+                const json = await r.json()
+                if (!Array.isArray(json) || json.length === 0) return
+                const lastRaw = json[json.length - 1]
+                const last = klineArrayToPoint(lastRaw)
+
+                // apply the same update logic as websocket
+                const areaPoint = { time: last.time, value: (last.close + last.open) / 2 }
+                if (candles.length && candles[candles.length - 1].time === last.time) {
+                    candles[candles.length - 1] = last
+                    try { candleSeries.update(last) } catch (err) { candleSeries.setData(candles) }
+                    if (areaSeries) {
+                        try { areaSeries.update(areaPoint) } catch (err) { 
+                            const lineData = candles.map(dp => ({ time: dp.time, value: (dp.close + dp.open) / 2 }))
+                            areaSeries.setData(lineData) 
+                        }
+                    }
+                    // Update MA
+                    if (maSeries && candles.length >= MA_LENGTH) {
+                        let sum = 0
+                        for (let j = 0; j < MA_LENGTH; j++) {
+                            sum += candles[candles.length - 1 - j].close
+                        }
+                        const maValue = sum / MA_LENGTH
+                        try { maSeries.update({ time: last.time, value: maValue }) } catch (err) {
+                            const maData = calculateMovingAverageSeriesData(candles, MA_LENGTH)
+                            maSeries.setData(maData)
+                        }
+                    }
+                } else {
+                    candles.push(last)
+                    try { candleSeries.update(last) } catch (err) { candleSeries.setData(candles) }
+                    if (areaSeries) {
+                        try { areaSeries.update(areaPoint) } catch (err) { 
+                            const lineData = candles.map(dp => ({ time: dp.time, value: (dp.close + dp.open) / 2 }))
+                            areaSeries.setData(lineData) 
+                        }
+                    }
+                    // Update MA
+                    if (maSeries && candles.length >= MA_LENGTH) {
+                        let sum = 0
+                        for (let j = 0; j < MA_LENGTH; j++) {
+                            sum += candles[candles.length - 1 - j].close
+                        }
+                        const maValue = sum / MA_LENGTH
+                        try { maSeries.update({ time: last.time, value: maValue }) } catch (err) {
+                            const maData = calculateMovingAverageSeriesData(candles, MA_LENGTH)
+                            maSeries.setData(maData)
+                        }
                     }
                 }
-                lastprice = point.close
-    } catch (e) {
-        console.error('ws message parse error', e);
+
+                if (priceEl) {
+                    priceEl.innerText = '$' + last.close.toFixed(4)
+                    try { priceEl.style.color = !lastprice || lastprice === last.close ? 'black' : last.close > lastprice ? 'green' : 'red' } catch (e) {}
+                }
+                lastprice = last.close
+            } catch (e) {
+                console.error('polling error', e)
+            }
+        }, POLLING_INTERVAL)
     }
-};
+
+    function stopPolling() {
+        if (!pollingTimer) return
+        clearInterval(pollingTimer)
+        pollingTimer = null
+    }
+
+    function connectWebSocket() {
+        if (destroyed) return
+        // debounce actual socket creation to avoid quick mount/unmount races (React StrictMode)
+        if (connectTimer) clearTimeout(connectTimer)
+        connectTimer = setTimeout(() => {
+            if (destroyed) return
+            const url = `wss://stream.binance.com:443/stream?streams=${SYMBOLLOWER}@kline_${INTERVAL}`
+            try {
+                ws = new WebSocket(url)
+            } catch (err) {
+                // creation failed synchronously
+                if (reconnectAttempts > 0) console.warn('WebSocket creation failed', err)
+                scheduleReconnect()
+                return
+            }
+
+            ws.onopen = () => {
+                reconnectAttempts = 0
+                if (reconnectTimer) {
+                    clearTimeout(reconnectTimer)
+                    reconnectTimer = null
+                }
+                stopPolling()
+            }
+
+            ws.onmessage = handleWsMessage
+
+            ws.onerror = (err) => {
+                if (reconnectAttempts > 0) console.warn('WebSocket error after', reconnectAttempts, 'attempts')
+            }
+
+            ws.onclose = (ev) => {
+                if (destroyed) return
+                if (reconnectAttempts > 0 && ev?.code !== 1000) {
+                    console.warn('WebSocket closed unexpectedly:', ev?.code, ev?.reason)
+                }
+                scheduleReconnect()
+            }
+        }, 120)
+    }
+
+    function scheduleReconnect() {
+        if (destroyed) return
+        reconnectAttempts += 1
+        const maxDelay = 30 * 1000
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), maxDelay)
+        
+        // Start polling as fallback after multiple failed attempts
+        if (reconnectAttempts >= POLL_AFTER_ATTEMPTS) {
+            startPolling()
+        }
+        
+        if (reconnectTimer) clearTimeout(reconnectTimer)
+        reconnectTimer = setTimeout(() => {
+            connectWebSocket()
+        }, delay)
+    }
+
+    // start websocket
+    connectWebSocket()
+
+    // Resize handling: keep chart width in sync with its container
+    let resizeObserver = null
+    const safeResize = () => {
+        try {
+            const w = Math.max(0, Math.floor(containerEl.clientWidth))
+            const h = Math.max(0, Math.floor(containerEl.clientHeight || height))
+            if (typeof chart.resize === 'function') {
+                chart.resize(w, h)
+            } else {
+                chart.applyOptions({ width: w, height: h })
+            }
+        } catch (e) {
+            // ignore resize errors
+        }
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+            safeResize()
+        })
+        try { resizeObserver.observe(containerEl) } catch (e) {}
+    } else {
+        // fallback to window resize
+        window.addEventListener('resize', safeResize)
+    }
 
 // Convert a visible time item returned by the chart into a unix seconds timestamp
 function toTimestampSeconds(t) {
@@ -200,6 +488,21 @@ function toTimestampSeconds(t) {
         }
         candles = filtered.concat(candles);
         candleSeries.setData(candles);
+        
+        // Update area series with new data
+        if (areaSeries) {
+            const lineData = candles.map(dp => ({ 
+                time: dp.time, 
+                value: (dp.close + dp.open) / 2 
+            }))
+            areaSeries.setData(lineData)
+        }
+        
+        // Update moving average with new data
+        if (maSeries) {
+            const maData = calculateMovingAverageSeriesData(candles, MA_LENGTH)
+            maSeries.setData(maData)
+        }
     } catch (e) {
         console.error('failed loading older klines', e);
     } finally {
@@ -219,15 +522,44 @@ function toTimestampSeconds(t) {
 
     // expose a destroy/cleanup function
     function destroy() {
+        destroyed = true
         try {
-            ws.close()
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer)
+                reconnectTimer = null
+            }
+        } catch (_) {}
+        try {
+            stopPolling()
+        } catch (_) {}
+        try {
+            if (connectTimer) {
+                clearTimeout(connectTimer)
+                connectTimer = null
+            }
+        } catch (_) {}
+        try {
+            // Close WebSocket in any state except CLOSED, silently handle all cases
+            if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== 3) {
+                ws.close(1000, 'Component unmounting')
+            }
         } catch (e) {
-            // ignore
+            // Silently handle - this is expected during React StrictMode cleanup
         }
         try {
             if (typeof unsub === 'function') unsub()
         } catch (_) {}
-        try { chart.remove() } catch (_) {}
+        try {
+            if (resizeObserver) {
+                try { resizeObserver.disconnect() } catch (_) {}
+                resizeObserver = null
+            } else {
+                try { window.removeEventListener('resize', safeResize) } catch (_) {}
+            }
+        } catch (_) {}
+        try {
+            chart.remove()
+        } catch (_) {}
     }
 
     // start initial load
@@ -241,8 +573,8 @@ function toTimestampSeconds(t) {
 
 }
 
-
-
+// Keep backward-compatible export name
+export { initBinanceCandleChart as initCandleChart }
 
 // This is a function that displays price of BTC.
 // let lastprice = null;
