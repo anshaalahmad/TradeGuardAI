@@ -1,4 +1,4 @@
-<!DOCTYPE html><!--  This site was created in Webflow. https://webflow.com  --><!--  Last Published: Wed Dec 24 2025 08:25:05 GMT+0000 (Coordinated Universal Time)  -->
+<!DOCTYPE html><!--  This site was created in Webflow. https://webflow.com  --><!--  Last Published: Wed Jan 14 2026 21:56:20 GMT+0000 (Coordinated Universal Time)  -->
 <html data-wf-page="692fdd3f46f373dec40e88aa" data-wf-site="69284f1f4a41d1c19de618ec">
 <head>
   <meta charset="utf-8">
@@ -65,7 +65,15 @@
                     <div class="main_form_fields"><label for="Name-Two-2" class="main_form_label">Name</label><input class="main_form_input w-input" maxlength="256" name="Name-Two-2" data-name="Name Two 2" placeholder="e.g. Howard Thurman" type="text" id="Name-Two-2" data-ms-member="name" required=""></div>
                     <div class="main_form_fields"><label for="Email-One-2" class="main_form_label">Email Address</label><input class="main_form_input w-input" maxlength="256" name="Email-One-2" data-name="Email One 2" placeholder="e.g. howard@gmail.com" type="email" id="Email-One-2" data-ms-member="email" required=""></div>
                     <div class="main_form_fields"><label for="Password-One-2" class="main_form_label">Password Input</label><input class="main_form_input w-input" maxlength="256" name="Password-One-2" data-name="Password One 2" placeholder="⁕ ⁕ ⁕ ⁕ ⁕ ⁕ ⁕ ⁕" type="password" id="Password-One-2" data-ms-member="password" required="">
-                      <div class="main_form_helptext">Minimum length is 8 characters</div>
+                      <div class="update_password-check">
+                        <div class="text-size-small text-color-secondary text-weight-semibold">Your password must contains:</div>
+                        <ul role="list" class="login-list">
+                          <li id="length-6" class="password-requirements">A minimum of 8 characters.</li>
+                          <li id="number-6" class="password-requirements">At least one number</li>
+                          <li id="special-6" class="password-requirements">At least 1 special character</li>
+                          <li id="capital-6" class="password-requirements">At least one uppercase letter</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                   <div class="main_form_footer"><input type="submit" data-wait="Please wait..." class="button is-full-width w-button" value="Submit">
@@ -79,9 +87,8 @@
                         <div data-ms-auth-connected-text="Disconnect Google" class="ms-social-text">Continue with Google</div>
                       </div>
                     </a>
-                    <div>Already have an account? <a href="/login" class="ms-link">Login here</a>
-                    </div>
-                  </div><img src="../../images/Mask-group-1.png" loading="lazy" alt="" class="signup_main_decor">
+                  </div>
+                  <div class="main_form_close_button"><img src="../../images/close_black_24dp.svg" loading="lazy" alt="" class="main_form_close_icon"></div>
                 </form>
                 <div class="w-form-done">
                   <div>Thank you! Your submission has been received!</div>
@@ -94,7 +101,7 @@
           </div>
         </div>
       </div>
-      <div class="form_main_image_wrapper"><img src="../../images/Page-1.jpg" loading="lazy" sizes="(max-width: 1000px) 100vw, 1000px" srcset="../../images/Page-1-p-500.jpg 500w, ../../images/Page-1-p-800.jpg 800w, ../../images/Page-1.jpg 1000w" alt="" class="form_main_image"></div>
+      <div class="form_main_image_wrapper"><img src="../../images/Page-1.jpg" loading="lazy" sizes="240px" srcset="../../images/Page-1-p-500.jpg 500w, ../../images/Page-1-p-800.jpg 800w, ../../images/Page-1.jpg 1000w" alt="" class="form_main_image"></div>
       <div class="form_main_blur"></div>
     </section>
   </div>

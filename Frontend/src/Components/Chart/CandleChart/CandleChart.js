@@ -18,8 +18,12 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
     const INTERVAL = opts.interval || '1m'
     const PAGE_LIMIT = opts.pageLimit || 50
     const height = opts.height || 400
+    console.log('[CandleChart.js] initBinanceCandleChart', { SYMBOL, INTERVAL, PAGE_LIMIT, height, opts });
 
-    if (!containerEl) throw new Error('containerEl required')
+    if (!containerEl) {
+        console.error('[CandleChart.js] containerEl required but missing!');
+        throw new Error('containerEl required')
+    }
 
     let candles = []
     let isLoadingOlder = false
@@ -179,29 +183,30 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
     async function loadInitial() {
         try {
             const url = `https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=${INTERVAL}&limit=${PAGE_LIMIT}`
+            console.log('[CandleChart.js] Fetching initial klines:', url);
             const r = await fetch(url)
             const json = await r.json()
             const initial = Array.isArray(json) ? json.map(klineArrayToPoint) : []
-            if (!initial.length) return
+            console.log('[CandleChart.js] Initial klines result:', initial);
+            if (!initial.length) {
+                console.warn('[CandleChart.js] No initial kline data received!');
+                return
+            }
             candles = initial
-            
             // Convert candlestick data for area series
             const lineData = candles.map(datapoint => ({
                 time: datapoint.time,
                 value: (datapoint.close + datapoint.open) / 2,
             }))
-            
             // Set data for area series if it exists
             if (areaSeries) {
                 areaSeries.setData(lineData)
             }
-            
             // Calculate and set moving average data
             if (maSeries) {
                 const maData = calculateMovingAverageSeriesData(candles, MA_LENGTH)
                 maSeries.setData(maData)
             }
-            
             // Set data for candlestick series
             candleSeries.setData(candles)
             chart.timeScale().fitContent()
@@ -211,7 +216,7 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
             }
             lastprice = last?.close ?? null
         } catch (err) {
-            console.error('Failed loading historical klines:', err)
+            console.error('[CandleChart.js] Failed loading historical klines:', err)
         }
     }
 

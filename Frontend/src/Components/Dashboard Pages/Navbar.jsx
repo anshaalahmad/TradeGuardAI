@@ -1,30 +1,41 @@
-import React, { useState, useEffect } from 'react'
-import '../../css/normalize.css'
-import '../../css/webflow.css'
-import '../../css/tradeguard-ai.webflow.css'
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import '../../css/normalize.css';
+import '../../css/webflow.css';
+import '../../css/tradeguard-ai.webflow.css';
 
-export default function Navbar({ userName = 'Anshaal Ahmad', onSearch, onProfileClick, onMenuToggle, isSidebarOpen = false }) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [submitStatus, setSubmitStatus] = useState(null)
+export default function Navbar({ onSearch, onMenuToggle, isSidebarOpen = false }) {
+  const navigate = useNavigate();
+  const { member, logout } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  const userName = member?.customFields?.name || member?.auth?.email?.split('@')[0] || 'User';
 
   const handleSearchSubmit = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     
     if (searchQuery.trim()) {
-      onSearch?.(searchQuery)
-      setSubmitStatus('success')
-      setSearchQuery('')
-      setTimeout(() => setSubmitStatus(null), 3000)
+      onSearch?.(searchQuery);
+      setSearchQuery('');
     }
-  }
+  };
 
   const handleMenuToggle = () => {
-    onMenuToggle?.()
-  }
+    onMenuToggle?.();
+  };
 
   const handleProfileClick = () => {
-    onProfileClick?.()
-  }
+    setShowProfileMenu(!showProfileMenu);
+  };
+
+  const handleLogout = async () => {
+    const result = await logout();
+    if (result.success) {
+      navigate('/');
+    }
+  };
 
   return (
     <div 
@@ -65,7 +76,7 @@ export default function Navbar({ userName = 'Anshaal Ahmad', onSearch, onProfile
             <button
               onClick={handleProfileClick}
               className="navbar_app_profile_wrapper"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, position: 'relative' }}
             >
               <div className="navbar_app_profile_image_wrapper">
                 <img
@@ -79,6 +90,45 @@ export default function Navbar({ userName = 'Anshaal Ahmad', onSearch, onProfile
                 <div className="text-size-regular text-weight-medium text-color-primary">{userName}</div>
                 <div className="text-size-tiny">View your profile</div>
               </div>
+              
+              {showProfileMenu && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.5rem',
+                  backgroundColor: 'white',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  minWidth: '200px',
+                  zIndex: 1000,
+                  overflow: 'hidden'
+                }}>
+                  <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e5e5e7' }}>
+                    <div className="text-size-small text-weight-medium">{userName}</div>
+                    <div className="text-size-tiny text-color-secondary">{member?.auth?.email}</div>
+                  </div>
+                  <div
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#323539'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    Logout
+                  </div>
+                </div>
+              )}
             </button>
           </div>
         </nav>

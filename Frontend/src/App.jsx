@@ -1,64 +1,53 @@
-import React, { useState } from 'react'
-import './css/normalize.css'
-import './css/tradeguard-ai.webflow.css'
-import './css/webflow.css'
-import Navbar from './Components/Dashboard Pages/Navbar'
-import Sidebar from './Components/Dashboard Pages/Sidebar'
-import Navlinks from './Components/Dashboard Pages/Navlinks'
-import BinanceCandleChartCard from './Components/Chart/CandleChart/BinanceCandleChartCard.jsx'
-import OrderBookCard from './Components/Chart/OrderBook/OrderBookCard.jsx'
-import MarketTradesCard from './Components/Chart/MarketTrades/MarketTradesCard.jsx'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './Components/ProtectedRoute';
+import './css/normalize.css';
+import './css/tradeguard-ai.webflow.css';
+import './css/webflow.css';
+
+// Import page components
+import DashboardApp from './pages/DashboardApp';
+import { LandingPage } from './Components/Landing';
+import LoginPage from './pages/LoginPage';
+import SignUpPage from './pages/SignUpPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
 export default function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  
-  // Trading pair configuration - change here to update both components
-  const tradingConfig = {
-    name: "Bitcoin",
-    symbol: "BTC",
-    chartSymbol: "BTCUSDT",
-    interval: "1h",
-    height: 400,
-    maxOrders: 8,
-    maxTrades: 10
-  }
-
-  const handleMenuToggle = () => {
-    setIsSidebarOpen(!isSidebarOpen)
-  }
-
   return (
-    <div className='page-wrapper'>
-      <div className='main-wrapper is-dashboard'>
-        <Sidebar isOpen={isSidebarOpen} />
-        <div className='dashboard_main_wrapper'>
-          <Navbar onMenuToggle={handleMenuToggle} isSidebarOpen={isSidebarOpen} />
-          <Navlinks />
-          <div className='dashboard_main_app'>
-            <div className='dashboard_main_content'>
-              <BinanceCandleChartCard
-                name={tradingConfig.name}
-                symbol={tradingConfig.symbol}
-                chartSymbol={tradingConfig.chartSymbol}
-                interval={tradingConfig.interval}
-                height={tradingConfig.height}
-              />
-              <div className='content_main_flex'>
-                <OrderBookCard 
-                symbol={tradingConfig.chartSymbol}
-                baseAsset={tradingConfig.symbol}
-                maxOrders={tradingConfig.maxOrders}
-              />
-                <MarketTradesCard 
-                symbol={tradingConfig.chartSymbol}
-                baseAsset={tradingConfig.symbol}
-                maxTrades={tradingConfig.maxTrades}
-              />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+    <Router>
+      <AuthProvider>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          
+          {/* Protected Routes */}
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <DashboardApp />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardApp />
+              </ProtectedRoute>
+            }
+          />
+          {/* Redirect /cryptocurrency to /app for backward compatibility */}
+          <Route path="/cryptocurrency" element={<Navigate to="/app" replace />} />
+          
+          {/* Catch all - redirect to landing */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
+  );
 }

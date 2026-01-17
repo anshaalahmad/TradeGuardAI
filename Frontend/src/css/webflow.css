@@ -51,6 +51,7 @@ body {
   background-color: #fff;
   font-family: Arial, sans-serif;
   font-size: 14px;
+  line-height: 20px;
   color: #333;
 }
 img {
@@ -1564,6 +1565,7 @@ textarea.w-select {
 }
 .w-nav {
   position: relative;
+  background: #dddddd;
   z-index: 1000;
 }
 .w-nav:before,

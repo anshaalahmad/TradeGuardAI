@@ -40,7 +40,7 @@ export default function Sidebar({ userName = 'Anshaal Ahmad', onNavigate, active
               key={link.id}
               onClick={() => handleNavClick(link.id, link.path)}
               className={`sidebar_app_link ${activeLink === link.id ? 'is-active' : ''}`}
-              style={{ borderRadius: '0px' }}
+              style={activeLink !== link.id ? { color: '#666' } : {}}
             >
               <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/6942811bece7a69907efd693_Icon.svg" loading="lazy" alt={`${link.label} Icon`} />
               <div className="text-size-medium">{link.label}</div>
