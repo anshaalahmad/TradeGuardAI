@@ -1,13 +1,51 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 
-export default function Sidebar({ userName = 'Anshaal Ahmad', onNavigate, activePage, isOpen = false }) {
+export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
+  const { member } = useAuth()
+  const location = useLocation()
+  console.log('[Sidebar] Member data:', member);
+  const userName = member?.customFields?.['first-name'] || member?.auth?.email?.split('@')[0] || 'User'
   const [activeLink, setActiveLink] = useState(activePage || 'cryptocurrency')
 
+  // Update active link based on current location
+  useEffect(() => {
+    const path = location.pathname
+    if (path.startsWith('/predictions')) {
+      setActiveLink('predictions')
+    } else if (path.startsWith('/cryptocurrency')) {
+      setActiveLink('cryptocurrency')
+    } else if (path.startsWith('/resources')) {
+      setActiveLink('resources')
+    } else if (path.startsWith('/portfolio')) {
+      setActiveLink('portfolio')
+    } else if (activePage) {
+      setActiveLink(activePage)
+    }
+  }, [location.pathname, activePage])
+
   const navigationLinks = [
-    { id: 'cryptocurrency', label: 'Cryptocurrency', path: '/cryptocurrency' },
-    { id: 'predictions', label: 'Predictions', path: '/predictions' },
-    { id: 'resources', label: 'Resources', path: '/resources' },
-    { id: 'portfolio', label: 'My Portfolio', path: '/portfolio' },
+    { 
+      id: 'cryptocurrency', 
+      label: 'Cryptocurrency', 
+      path: '/cryptocurrency'
+    },
+    { 
+      id: 'predictions', 
+      label: 'Predictions', 
+      path: '/predictions'
+    },
+    { 
+      id: 'resources', 
+      label: 'Resources', 
+      path: '/resources'
+    },
+    { 
+      id: 'portfolio', 
+      label: 'My Portfolio', 
+      path: '/portfolio'
+    },
   ]
 
   const handleNavClick = (linkId, path) => {
@@ -42,7 +80,6 @@ export default function Sidebar({ userName = 'Anshaal Ahmad', onNavigate, active
               className={`sidebar_app_link ${activeLink === link.id ? 'is-active' : ''}`}
               style={activeLink !== link.id ? { color: '#666' } : {}}
             >
-              <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/6942811bece7a69907efd693_Icon.svg" loading="lazy" alt={`${link.label} Icon`} />
               <div className="text-size-medium">{link.label}</div>
             </button>
           ))}

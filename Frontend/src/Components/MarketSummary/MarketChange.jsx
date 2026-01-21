@@ -1,6 +1,9 @@
 import React from 'react';
 
 const MarketChange = ({ priceChanges = {} }) => {
+  // Check if we have any valid data
+  const hasAnyData = Object.values(priceChanges).some(val => val !== 0 && val !== null && val !== undefined);
+  
   const periods = [
     { key: '1h', label: '1h' },
     { key: '24h', label: '24h' },

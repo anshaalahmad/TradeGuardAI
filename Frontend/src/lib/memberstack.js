@@ -7,4 +7,10 @@ const memberstack = memberstackDOM.init({
   sessionDurationDays: 7, // JWT session duration (default is 14)
 });
 
+// Expose to window for debugging
+if (typeof window !== 'undefined') {
+  window.memberstack = memberstack;
+  console.log('Memberstack methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(memberstack)));
+}
+
 export default memberstack;

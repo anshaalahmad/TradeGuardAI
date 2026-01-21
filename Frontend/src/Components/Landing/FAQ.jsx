@@ -3,33 +3,33 @@ import React from 'react';
 const FAQ = () => {
   const faqs = [
     {
+      question: 'How accurate are the AI predictions?',
+      answer:
+        "Our deep learning models are trained on extensive historical data and achieve high accuracy rates. However, cryptocurrency markets are inherently volatile, and no prediction system is 100% accurate. We recommend using our signals as part of a comprehensive trading strategy.",
+    },
+    {
       question: 'Can I access a free trial?',
       answer:
-        "Enjoy a free 30-day trial of our job portal's premium features! Plus, get a complimentary 30-minute onboarding session to maximize your job search success.",
+        'Yes! We offer a 7-day free trial of TradeGuard AI with full access to all features. Experience real-time market analysis, AI predictions, and advanced charting tools with no credit card required.',
     },
     {
-      question: 'Can I modify my plan later?',
+      question: 'Which cryptocurrencies are supported?',
       answer:
-        'Absolutely! Our job portal pricing adapts to your hiring needs. Contact us to find the perfect plan for your company.',
+        'TradeGuard AI supports all major cryptocurrencies available on Binance, including Bitcoin (BTC), Ethereum (ETH), and thousands of altcoins. Real-time data feeds ensure you never miss market opportunities.',
     },
     {
-      question: "What's cancellation policy?",
+      question: 'Can I modify my subscription later?',
       answer:
-        'We get it—plans change. Cancel your job portal subscription anytime and get a refund for the unused portion, hassle-free!',
+        'Absolutely! You can upgrade or downgrade your TradeGuard AI subscription at any time. Changes take effect immediately, and billing is prorated accordingly.',
     },
     {
-      question: 'Can details be an invoice?',
+      question: "What's the cancellation policy?",
       answer:
-        'Currently, the only way to include extra details on job portal invoices is during the billing process.',
+        'You can cancel your subscription anytime from your account settings. Your access continues until the end of your current billing period, with no hidden fees or penalties.',
     },
     {
-      question: 'How is billing processed?',
-      answer:
-        'Job portal plans apply to each recruitment team, not the entire account. You can upgrade one team while keeping multiple free teams.',
-    },
-    {
-      question: 'How can update email?',
-      answer: 'To update your account email, visit untitled.com/account from a laptop or desktop.',
+      question: 'Is my data and trading information secure?',
+      answer: 'Security is our top priority. We use industry-standard encryption, never store API secret keys, and implement read-only API access for maximum safety. Your trading data is private and secure.',
     },
   ];
 
@@ -42,7 +42,7 @@ const FAQ = () => {
               <div className="faq_title-wrap">
                 <h2 className="heading-style-h2">Frequently asked questions</h2>
                 <p className="text-size-medium text-color-secondary">
-                  All the essential details about the product and billing.
+                  Everything you need to know about TradeGuard AI and our cryptocurrency trading platform.
                 </p>
               </div>
               <div className="faq_grid">

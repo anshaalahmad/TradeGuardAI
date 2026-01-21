@@ -2,6 +2,37 @@ import * as LightweightCharts from 'lightweight-charts'
 const { createChart } = LightweightCharts
 
 /**
+ * Format currency values with subscript notation for leading zeros
+ */
+function formatCurrency(value) {
+    const num = parseFloat(value)
+    if (isNaN(num)) return '$0.00'
+    
+    // For very small values, use subscript notation for leading zeros
+    if (num > 0 && num < 1) {
+        const str = num.toString()
+        const match = str.match(/^0\.(0+)([1-9]\d*)/)
+        
+        if (match && match[1].length >= 4) {
+            // Use subscript notation: $0.0₍₅₎57874
+            const leadingZeros = match[1].length
+            const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('')
+            const significantDigits = match[2].substring(0, 5)
+            return `$0.0₍${subscriptZeros}₎${significantDigits}`
+        }
+        
+        // For smaller numbers of leading zeros, show more decimals
+        if (num < 0.01) {
+            return `$${num.toFixed(8).replace(/\.?0+$/, '')}`
+        }
+        return `$${num.toFixed(6).replace(/\.?0+$/, '')}`
+    }
+    
+    // For values >= 1, use standard formatting
+    return `$${num.toFixed(2)}`
+}
+
+/**
  * Module to initialise a lightweight-candlestick chart and connect it to
  * Binance REST + websocket. Kept as a separate JS file (not JSX) so it can
  * run independently and be imported by the React component.
@@ -126,6 +157,32 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
         console.warn('Could not create moving average series:', err)
     }
 
+    // Custom price formatter for the Y-axis
+    const priceFormatter = (price) => {
+        const num = parseFloat(price)
+        if (isNaN(num)) return '0.00'
+        
+        // For very small values, use subscript notation for leading zeros
+        if (num > 0 && num < 1) {
+            const str = num.toString()
+            const match = str.match(/^0\.(0+)([1-9]\d*)/)
+            
+            if (match && match[1].length >= 4) {
+                const leadingZeros = match[1].length
+                const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('')
+                const significantDigits = match[2].substring(0, 5)
+                return `0.0₍${subscriptZeros}₎${significantDigits}`
+            }
+            
+            if (num < 0.01) {
+                return num.toFixed(8).replace(/\.?0+$/, '')
+            }
+            return num.toFixed(6).replace(/\.?0+$/, '')
+        }
+        
+        return num.toFixed(2)
+    }
+
     // Create a candlestick series. Different library versions expose
     // different helpers: prefer addCandlestickSeries, otherwise fall back
     // to addSeries('Candlestick', options) which works in some builds.
@@ -136,6 +193,10 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
         borderVisible: false,
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
+        priceFormat: {
+            type: 'custom',
+            formatter: priceFormatter,
+        },
     }
 
     if (typeof chart.addCandlestickSeries === 'function') {
@@ -212,7 +273,7 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
             chart.timeScale().fitContent()
             const last = candles[candles.length - 1]
             if (last && priceEl) {
-                priceEl.innerText = '$' + last.close.toFixed(4)
+                priceEl.innerText = formatCurrency(last.close)
             }
             lastprice = last?.close ?? null
         } catch (err) {
@@ -278,7 +339,7 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
             }
 
             if (priceEl) {
-                priceEl.innerText = '$' + point.close.toFixed(4)
+                priceEl.innerText = formatCurrency(point.close)
                 try {
                     priceEl.style.color = !lastprice || lastprice === point.close ? 'black' : point.close > lastprice ? 'green' : 'red'
                 } catch (err) {}
@@ -349,7 +410,7 @@ export function initBinanceCandleChart(containerEl, priceEl, opts = {}) {
                 }
 
                 if (priceEl) {
-                    priceEl.innerText = '$' + last.close.toFixed(4)
+                    priceEl.innerText = formatCurrency(last.close)
                     try { priceEl.style.color = !lastprice || lastprice === last.close ? 'black' : last.close > lastprice ? 'green' : 'red' } catch (e) {}
                 }
                 lastprice = last.close

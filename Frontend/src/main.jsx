@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './css/normalize.css'
 import './css/webflow.css'
 import './css/tradeguard-ai.webflow.css'
+import './css/responsive-fixes.css'
 import './index.css'
 import App from './App.jsx'
 

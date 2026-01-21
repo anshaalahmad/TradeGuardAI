@@ -19,9 +19,9 @@ const ProtectedRoute = ({ children, requiredPlan = null }) => {
     );
   }
 
-  // Redirect to landing page if not authenticated
+  // Redirect to login page if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // Check if specific plan is required

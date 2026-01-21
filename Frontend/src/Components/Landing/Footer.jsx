@@ -83,7 +83,7 @@ const Footer = () => {
           </div>
           <div className="footer_bottom">
             <div className="footer_brand">
-              <img loading="lazy" src="/images/Frame-4.svg" alt="TradeGuard AI" />
+              <div className="text-size-small text-align-center">TradeguardAI</div>
             </div>
             <div className="footer_bottom-mid">
               <Link to="/terms" className="footer_link">
@@ -102,7 +102,7 @@ const Footer = () => {
                 Cookies
               </Link>
             </div>
-            <div className="text-size-small text-align-center">© 2025 AeroKit. All rights reserved.</div>
+            <div className="text-size-small text-align-center">© 2025 TradeGuardAI. All rights reserved.</div>
           </div>
         </div>
       </div>

@@ -21,9 +21,21 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
         return;
       }
       // Fetch initial trades from backend proxy
-      const fetchInitialTrades = async () => {
+      const fetchInitialTrades = async (retryCount = 0) => {
         try {
           const response = await fetch(`http://localhost:4001/api/crypto/trades?symbol=${symbol}&limit=${maxTrades}`);
+          
+          if (!response.ok) {
+            // Handle rate limiting with retry
+            if (response.status === 429 && retryCount < 3) {
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+              console.warn(`[MarketTrades] Rate limited, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return fetchInitialTrades(retryCount + 1);
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const data = await response.json();
           const formattedTrades = (data.trades || []).map(trade => ({
             price: parseFloat(trade.price),
@@ -34,6 +46,8 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
           setTrades(formattedTrades);
         } catch (error) {
           console.error('Error fetching initial trades:', error);
+          // Don't fail completely - WebSocket will provide data once connected
+          console.warn('[MarketTrades] Proceeding with WebSocket despite initial fetch failure');
         }
       };
       fetchInitialTrades();
@@ -106,7 +120,30 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
   }, [symbol, maxTrades]);
 
   const formatPrice = (price) => {
-    return price.toLocaleString('en-US', {
+    const num = parseFloat(price);
+    if (isNaN(num)) return '0.00';
+    
+    // For very small values, use subscript notation for leading zeros
+    if (num > 0 && num < 1) {
+      const str = num.toString();
+      const match = str.match(/^0\.(0+)([1-9]\d*)/);
+      
+      if (match && match[1].length >= 4) {
+        // Use subscript notation: 0.0₍₅₎57874
+        const leadingZeros = match[1].length;
+        const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
+        const significantDigits = match[2].substring(0, 5);
+        return `0.0₍${subscriptZeros}₎${significantDigits}`;
+      }
+      
+      // For smaller numbers of leading zeros, show more decimals
+      if (num < 0.01) {
+        return num.toFixed(8).replace(/\.?0+$/, '');
+      }
+      return num.toFixed(6).replace(/\.?0+$/, '');
+    }
+    
+    return num.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
@@ -163,7 +200,7 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
           <div>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
-                <tr style={{ backgroundColor: 'var(--background-grey)', borderBottom: '1px solid var(--border-color--border-primary)' }}>
+                <tr style={{ backgroundColor: 'var(--background-header)', borderBottom: '1px solid var(--border-color--border-primary)' }}>
                   <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '33%' }}>Price (USDT)</th>
                   <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '33%' }}>Amount ({baseAsset})</th>
                   <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '34%' }}>Time</th>
@@ -216,13 +253,44 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
 
       {/* Empty State */}
       {!notOnBinance && trades.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '2rem',
-          color: 'var(--text-color--text-tertiary)',
-          fontSize: '0.875rem'
-        }}>
-          Connecting to market trades...
+        <div style={{ padding: '1rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--background-header)', borderBottom: '1px solid var(--border-color--border-primary)' }}>
+                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '33%' }}>Price (USDT)</th>
+                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '33%' }}>Amount ({baseAsset})</th>
+                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '34%' }}>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(maxTrades)].map((_, idx) => (
+                <tr key={idx} style={{ height: '26px' }}>
+                  <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                    <div className="skeleton skeleton-text" style={{ width: '70px', height: '14px', marginLeft: 'auto' }} />
+                  </td>
+                  <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                    <div className="skeleton skeleton-text" style={{ width: '60px', height: '14px', marginLeft: 'auto' }} />
+                  </td>
+                  <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                    <div className="skeleton skeleton-text" style={{ width: '50px', height: '14px', marginLeft: 'auto' }} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <style>{`
+            .skeleton {
+              background: linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 20%, #f0f0f0 40%, #f0f0f0 100%);
+              background-size: 200% 100%;
+              animation: shimmer 1.5s ease-in-out infinite;
+              border-radius: 4px;
+            }
+            .skeleton-text { display: inline-block; }
+            @keyframes shimmer {
+              0% { background-position: 200% 0; }
+              100% { background-position: -200% 0; }
+            }
+          `}</style>
         </div>
       )}
     </div>

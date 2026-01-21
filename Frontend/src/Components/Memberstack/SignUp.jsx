@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-const SignUp = ({ onClose }) => {
+const SignUp = ({ onClose, showCloseButton = true }) => {
   const navigate = useNavigate();
   const { signup, signupWithGoogle } = useAuth();
   const [formData, setFormData] = useState({
@@ -58,7 +58,7 @@ const SignUp = ({ onClose }) => {
 
     try {
       const result = await signup(formData.email, formData.password, {
-        name: formData.name
+        'first-name': formData.name
       });
       
       if (result.success) {
@@ -93,7 +93,7 @@ const SignUp = ({ onClose }) => {
       
       if (result.success) {
         if (onClose) onClose();
-        navigate('/app');
+        navigate('/dashboard');
       } else {
         setError(result.error || 'Google signup failed.');
       }
@@ -138,7 +138,7 @@ const SignUp = ({ onClose }) => {
                 id="Name-Two-2"
                 value={formData.name}
                 onChange={handleChange}
-                data-ms-member="name"
+                data-ms-member="first-name"
                 required
               />
             </div>
@@ -182,25 +182,25 @@ const SignUp = ({ onClose }) => {
                 <ul role="list" className="login-list">
                   <li
                     id="length-6"
-                    className={`password-requirements ${passwordValidation.length ? 'is-valid' : ''}`}
+                    className="password-requirements"
                   >
                     A minimum of 8 characters.
                   </li>
                   <li
                     id="number-6"
-                    className={`password-requirements ${passwordValidation.number ? 'is-valid' : ''}`}
+                    className="password-requirements"
                   >
                     At least one number
                   </li>
                   <li
                     id="special-6"
-                    className={`password-requirements ${passwordValidation.special ? 'is-valid' : ''}`}
+                    className="password-requirements"
                   >
                     At least 1 special character
                   </li>
                   <li
                     id="capital-6"
-                    className={`password-requirements ${passwordValidation.capital ? 'is-valid' : ''}`}
+                    className="password-requirements"
                   >
                     At least one uppercase letter
                   </li>
@@ -216,29 +216,13 @@ const SignUp = ({ onClose }) => {
               value={isLoading ? 'Please wait...' : 'Submit'}
               disabled={isLoading}
             />
-            <div className="main_form_divider">
-              <div className="main_form_divider_line"></div>
-              <div className="main_form_divider_text">OR</div>
-              <div className="main_form_divider_line"></div>
-            </div>
-            <a 
-              data-ms-auth-provider="google" 
-              href="#" 
-              onClick={handleGoogleSignup} 
-              className="main_form_social_button w-inline-block"
-            >
-              <div className="ms-social-inner ms-is-center">
-                <img alt="" loading="lazy" src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/6936e975945489a24f875895_b7727941c0e8a117b6cfd8f06a1cb7ed_google.svg" className="ms-social-image" />
-                <div data-ms-auth-connected-text="Disconnect Google" className="ms-social-text">
-                  Continue with Google
-                </div>
-              </div>
-            </a>
           </div>
           
-          <div className="main_form_close_button" onClick={onClose} style={{ cursor: 'pointer' }}>
-            <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/696807b39a055f53b4271712_close_black_24dp.svg" loading="lazy" alt="" className="main_form_close_icon" />
-          </div>
+          {showCloseButton && (
+            <div className="main_form_close_button" onClick={onClose} style={{ cursor: 'pointer' }}>
+              <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/696807b39a055f53b4271712_close_black_24dp.svg" loading="lazy" alt="" className="main_form_close_icon" />
+            </div>
+          )}
         </form>
         <div className="w-form-done">
           <div>Thank you! Your submission has been received!</div>

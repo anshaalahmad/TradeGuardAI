@@ -11,7 +11,8 @@ export default function Navbar({ onSearch, onMenuToggle, isSidebarOpen = false }
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const userName = member?.customFields?.name || member?.auth?.email?.split('@')[0] || 'User';
+  console.log('[Navbar] Member data:', member);
+  const userName = member?.customFields?.['first-name'] || member?.auth?.email?.split('@')[0] || 'User';
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -109,6 +110,34 @@ export default function Navbar({ onSearch, onMenuToggle, isSidebarOpen = false }
                     <div className="text-size-tiny text-color-secondary">{member?.auth?.email}</div>
                   </div>
                   <div
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/profile');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#323539',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Profile Settings
+                  </div>
+                  <div
                     onClick={handleLogout}
                     style={{
                       width: '100%',
@@ -118,13 +147,20 @@ export default function Navbar({ onSearch, onMenuToggle, isSidebarOpen = false }
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: '0.875rem',
-                      color: '#323539'
+                      color: '#ef5350',
+                      borderTop: '1px solid #e5e5e7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fef2f2'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     role="button"
                     tabIndex={0}
                   >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9M16 17L21 12M21 12L16 7M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     Logout
                   </div>
                 </div>

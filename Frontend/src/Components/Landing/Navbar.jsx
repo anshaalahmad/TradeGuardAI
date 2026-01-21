@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Login, SignUp } from '../Memberstack';
 import { AuthContext } from '../../contexts/AuthContext';
 
 const Navbar = () => {
-  const { member } = useContext(AuthContext);
+  const { member, loading } = useContext(AuthContext);
+  const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
+
+  // Check if we're on login or signup pages
+  const isOnLoginPage = location.pathname === '/login';
+  const isOnSignUpPage = location.pathname === '/signup';
+  const isOnAuthPage = isOnLoginPage || isOnSignUpPage;
 
   useEffect(() => {
     if (showLogin || showSignUp) {
@@ -49,7 +55,10 @@ const Navbar = () => {
               Contact
             </Link>
             <div className="navbar_menu-buttons">
-              {member ? (
+              {loading ? (
+                // Show nothing or a subtle loading indicator while checking auth
+                <div style={{ width: '120px', height: '40px' }}></div>
+              ) : member ? (
                 <Link
                   to="/dashboard"
                   className="button w-button"
@@ -59,12 +68,27 @@ const Navbar = () => {
                 </Link>
               ) : (
                 <>
-                  <a onClick={() => setShowSignUp(true)} className="button w-button" style={{ cursor: 'pointer' }}>
-                    Sign up
-                  </a>
-                  <a onClick={() => setShowLogin(true)} className="button is-secondary w-button" style={{ cursor: 'pointer' }}>
-                    Log in
-                  </a>
+                  {isOnAuthPage ? (
+                    // On login/signup pages, use Link navigation instead of popups
+                    <>
+                      <Link to="/signup" className="button w-button">
+                        Sign up
+                      </Link>
+                      <Link to="/login" className="button is-secondary w-button">
+                        Log in
+                      </Link>
+                    </>
+                  ) : (
+                    // On other pages, show popups
+                    <>
+                      <a onClick={() => setShowSignUp(true)} className="button w-button" style={{ cursor: 'pointer' }}>
+                        Sign up
+                      </a>
+                      <a onClick={() => setShowLogin(true)} className="button is-secondary w-button" style={{ cursor: 'pointer' }}>
+                        Log in
+                      </a>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -81,8 +105,8 @@ const Navbar = () => {
         </div>
       </div>
       
-      {/* Simple Overlay */}
-      {(showLogin || showSignUp) && (
+      {/* Simple Overlay - Only show on pages other than login/signup */}
+      {!isOnAuthPage && (showLogin || showSignUp) && (
         <div 
           onClick={() => {
             setShowLogin(false);

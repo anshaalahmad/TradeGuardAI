@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-const Login = ({ onClose }) => {
+const Login = ({ onClose, showCloseButton = true }) => {
   const navigate = useNavigate();
   const { login, loginWithGoogle } = useAuth();
   const [formData, setFormData] = useState({
@@ -64,7 +64,7 @@ const Login = ({ onClose }) => {
       
       if (result.success) {
         if (onClose) onClose();
-        navigate('/app');
+        navigate('/dashboard');
       } else {
         setError(result.error || 'Google login failed.');
       }
@@ -162,9 +162,11 @@ const Login = ({ onClose }) => {
             </a>
           </div>
           
-          <div className="main_form_close_button" onClick={onClose} style={{ cursor: 'pointer' }}>
-            <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/696807b39a055f53b4271712_close_black_24dp.svg" loading="lazy" alt="" className="main_form_close_icon" />
-          </div>
+          {showCloseButton && (
+            <div className="main_form_close_button" onClick={onClose} style={{ cursor: 'pointer' }}>
+              <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/696807b39a055f53b4271712_close_black_24dp.svg" loading="lazy" alt="" className="main_form_close_icon" />
+            </div>
+          )}
         </form>
         <div className="w-form-done">
           <div>Thank you! Your submission has been received!</div>

@@ -8,6 +8,8 @@ import './css/webflow.css';
 
 // Import page components
 import DashboardApp from './pages/DashboardApp';
+import PredictionsPage from './pages/PredictionsPage';
+import ProfilePage from './pages/ProfilePage';
 import { LandingPage } from './Components/Landing';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
@@ -41,8 +43,49 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          {/* Redirect /cryptocurrency to /app for backward compatibility */}
-          <Route path="/cryptocurrency" element={<Navigate to="/app" replace />} />
+          {/* Cryptocurrency pages */}
+          <Route
+            path="/cryptocurrency"
+            element={
+              <ProtectedRoute>
+                <DashboardApp />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cryptocurrency/:coinName"
+            element={
+              <ProtectedRoute>
+                <DashboardApp />
+              </ProtectedRoute>
+            }
+          />
+          {/* Predictions page */}
+          <Route
+            path="/predictions"
+            element={
+              <ProtectedRoute>
+                <PredictionsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/predictions/:coinId"
+            element={
+              <ProtectedRoute>
+                <PredictionsPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Profile page */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Catch all - redirect to landing */}
           <Route path="*" element={<Navigate to="/" replace />} />

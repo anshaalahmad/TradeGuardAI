@@ -42,10 +42,12 @@ export function AuthProvider({ children }) {
         email,
         password,
       });
+      console.log('Login response:', loggedInMember);
       // Fetch the complete member data after login
       const { data: currentMember } = await memberstack.getCurrentMember();
+      console.log('Current member after login:', currentMember);
       setMember(currentMember || loggedInMember);
-      return { success: true, member: loggedInMember };
+      return { success: true, member: currentMember || loggedInMember };
     } catch (err) {
       return { success: false, error: err.message || 'Login failed' };
     }
@@ -53,13 +55,18 @@ export function AuthProvider({ children }) {
 
   const signup = async (email, password, customFields = {}) => {
     try {
+      console.log('Signing up with customFields:', customFields);
       const { data: newMember } = await memberstack.signupMemberEmailPassword({
         email,
         password,
         customFields,
       });
-      setMember(newMember);
-      return { success: true, member: newMember };
+      console.log('Signup response:', newMember);
+      // Fetch the complete member data after signup to ensure customFields are loaded
+      const { data: currentMember } = await memberstack.getCurrentMember();
+      console.log('Current member after signup:', currentMember);
+      setMember(currentMember || newMember);
+      return { success: true, member: currentMember || newMember };
     } catch (err) {
       return { success: false, error: err.message || 'Signup failed' };
     }
@@ -127,9 +134,13 @@ export function AuthProvider({ children }) {
 
   const resetPassword = async (token, newPassword) => {
     try {
-      await memberstack.resetMemberPassword({ token, newPassword });
-      return { success: true };
+      const result = await memberstack.resetMemberPassword({ 
+        token: token,
+        newPassword: newPassword 
+      });
+      return { success: true, data: result };
     } catch (err) {
+      console.error('Password reset error:', err);
       return { success: false, error: err.message || 'Password reset failed' };
     }
   };
@@ -141,6 +152,55 @@ export function AuthProvider({ children }) {
       return { success: true, member: updatedMember };
     } catch (err) {
       return { success: false, error: err.message || 'Update failed' };
+    }
+  };
+
+  const updateMemberAuth = async (currentPassword, newEmail = null, newPassword = null) => {
+    try {
+      // For password change: use setPassword method with correct parameter names
+      if (newPassword) {
+        console.log('Using setPassword method');
+        // Try different parameter combinations
+        const result = await memberstack.setPassword({
+          oldPassword: currentPassword,
+          password: newPassword,
+        });
+        console.log('setPassword result:', result);
+        
+        const { data: currentMember } = await memberstack.getCurrentMember();
+        setMember(currentMember);
+        return { success: true, member: currentMember };
+      }
+      
+      // For email change: use updateMemberAuth method
+      if (newEmail) {
+        console.log('Using updateMemberAuth for email change');
+        const result = await memberstack.updateMemberAuth({
+          currentPassword,
+          email: newEmail,
+        });
+        console.log('updateMemberAuth result:', result);
+        
+        const { data: currentMember } = await memberstack.getCurrentMember();
+        setMember(currentMember || result?.data);
+        return { success: true, member: currentMember || result?.data };
+      }
+      
+      return { success: false, error: 'No update parameters provided' };
+    } catch (err) {
+      console.error('Update member auth error:', err);
+      console.error('Error details:', err.response || err);
+      return { success: false, error: err.message || 'Update failed' };
+    }
+  };
+
+  const deleteMemberAccount = async () => {
+    try {
+      await memberstack.deleteMember();
+      setMember(null);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Delete failed' };
     }
   };
 
@@ -159,6 +219,8 @@ export function AuthProvider({ children }) {
     sendPasswordResetEmail,
     resetPassword,
     updateMemberInfo,
+    updateMemberAuth,
+    deleteMemberAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

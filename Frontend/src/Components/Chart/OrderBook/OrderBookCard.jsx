@@ -54,14 +54,34 @@ export default function OrderBookCard({
       pendingUpdateRef.current = null;
       lastUpdateTimeRef.current = 0;
 
-      const fetchInitialOrderBook = async () => {
+      const fetchInitialOrderBook = async (retryCount = 0) => {
         try {
           // Use backend proxy to avoid CORS
           const response = await fetch(
             `http://localhost:4001/api/crypto/orderbook?symbol=${symbol}`
           );
+          
+          if (!response.ok) {
+            // Handle rate limiting with retry
+            if (response.status === 429 && retryCount < 3) {
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+              console.warn(`[OrderBook] Rate limited, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return fetchInitialOrderBook(retryCount + 1);
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const data = await response.json();
+          
           if (!isSubscribed) return;
+          
+          // Validate data structure
+          if (!data || !Array.isArray(data.bids) || !Array.isArray(data.asks)) {
+            console.error('Invalid order book data structure:', data);
+            throw new Error('Invalid order book data received');
+          }
+          
           const sortedBids = data.bids
             .slice(0, maxOrders)
             .map(({ price, quantity }) => ({ price, quantity }));
@@ -79,7 +99,12 @@ export default function OrderBookCard({
           setLoading(false);
         } catch (error) {
           console.error('Failed to fetch initial order book:', error);
-          if (isSubscribed) setLoading(false);
+          if (isSubscribed) {
+            // If all retries failed, still proceed with WebSocket (it might work)
+            setLoading(false);
+            // Don't set wsError here - let WebSocket try to connect
+            console.warn('[OrderBook] Proceeding with WebSocket despite initial fetch failure');
+          }
         }
       };
 
@@ -196,10 +221,33 @@ export default function OrderBookCard({
   }, [symbol, maxOrders]);
 
   const formatPrice = useCallback((price) => {
-    return price.toLocaleString('en-US', {
+    const num = parseFloat(price);
+    if (isNaN(num)) return '0.00';
+    
+    // For very small values, use subscript notation for leading zeros
+    if (num > 0 && num < 1) {
+      const str = num.toString();
+      const match = str.match(/^0\.(0+)([1-9]\d*)/);
+      
+      if (match && match[1].length >= 4) {
+        // Use subscript notation: 0.0₍₅₎57874
+        const leadingZeros = match[1].length;
+        const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
+        const significantDigits = match[2].substring(0, 5);
+        return `0.0₍${subscriptZeros}₎${significantDigits}`;
+      }
+      
+      // For smaller numbers of leading zeros, show more decimals
+      if (num < 0.01) {
+        return num.toFixed(8).replace(/\.?0+$/, '');
+      }
+      return num.toFixed(6).replace(/\.?0+$/, '');
+    }
+    
+    return num.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })
+    });
   }, [])
 
   const formatQuantity = useCallback((qty) => {
@@ -256,8 +304,30 @@ export default function OrderBookCard({
           {/* Asks (Sell Orders) - Display in reverse (highest price at bottom) */}
           <div style={{ borderBottom: '1px solid var(--border-color--border-primary)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--background-header)', borderBottom: '1px solid var(--border-color--border-primary)' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '33%' }}>Price (USDT)</th>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '33%' }}>Amount</th>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-color--text-secondary)', width: '34%' }}>Total</th>
+                </tr>
+              </thead>
               <tbody>
-                {orderBook.asks.slice().reverse().map((order, idx) => {
+                {loading || orderBook.asks.length === 0 ? (
+                  [...Array(maxOrders)].map((_, idx) => (
+                    <tr key={`ask-skeleton-${idx}`} style={{ height: '26px' }}>
+                      <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                        <div className="skeleton skeleton-text" style={{ width: '70px', height: '14px', marginLeft: 'auto' }} />
+                      </td>
+                      <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                        <div className="skeleton skeleton-text" style={{ width: '60px', height: '14px', marginLeft: 'auto' }} />
+                      </td>
+                      <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                        <div className="skeleton skeleton-text" style={{ width: '65px', height: '14px', marginLeft: 'auto' }} />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  orderBook.asks.slice().reverse().map((order, idx) => {
                   const total = order.price * order.quantity;
                   return (
                     <tr key={`ask-${order.price}-${idx}`} style={{ height: '26px' }}>
@@ -282,7 +352,7 @@ export default function OrderBookCard({
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
@@ -327,7 +397,22 @@ export default function OrderBookCard({
           <div>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <tbody>
-                {orderBook.bids.map((order, idx) => {
+                {loading || orderBook.bids.length === 0 ? (
+                  [...Array(maxOrders)].map((_, idx) => (
+                    <tr key={`bid-skeleton-${idx}`} style={{ height: '26px' }}>
+                      <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                        <div className="skeleton skeleton-text" style={{ width: '70px', height: '14px', marginLeft: 'auto' }} />
+                      </td>
+                      <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                        <div className="skeleton skeleton-text" style={{ width: '60px', height: '14px', marginLeft: 'auto' }} />
+                      </td>
+                      <td style={{ padding: '0.25rem 0.75rem', textAlign: 'right' }}>
+                        <div className="skeleton skeleton-text" style={{ width: '65px', height: '14px', marginLeft: 'auto' }} />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  orderBook.bids.map((order, idx) => {
                   const total = order.price * order.quantity;
                   return (
                     <tr key={`bid-${order.price}-${idx}`} style={{ height: '26px' }}>
@@ -352,12 +437,26 @@ export default function OrderBookCard({
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
         </div>
       )}
+      
+      <style>{`
+        .skeleton {
+          background: linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 20%, #f0f0f0 40%, #f0f0f0 100%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s ease-in-out infinite;
+          border-radius: 4px;
+        }
+        .skeleton-text { display: inline-block; }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
     </div>
   );
 }

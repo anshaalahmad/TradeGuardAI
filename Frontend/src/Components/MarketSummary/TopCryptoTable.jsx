@@ -1,11 +1,35 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import coinOverrides from './coinOverrides';
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 10;
+const TOTAL_COINS = 50;
 
 const formatCurrency = (v) => {
   if (v === null || v === undefined || Number.isNaN(v)) return '—';
-  return typeof v === 'number' ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : v;
+  if (typeof v !== 'number') return v;
+  
+  // For very small values, use subscript notation for leading zeros
+  if (v > 0 && v < 1) {
+    const str = v.toString();
+    const match = str.match(/^0\.(0+)([1-9]\d*)/);
+    
+    if (match && match[1].length >= 4) {
+      // Use subscript notation: $0.0₍₅₎57874
+      const leadingZeros = match[1].length;
+      const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
+      const significantDigits = match[2].substring(0, 5);
+      return `$0.0₍${subscriptZeros}₎${significantDigits}`;
+    }
+    
+    // For smaller numbers of leading zeros, show more decimals
+    if (v < 0.01) {
+      return `$${v.toFixed(8).replace(/\.?0+$/, '')}`;
+    }
+    return `$${v.toFixed(6).replace(/\.?0+$/, '')}`;
+  }
+  
+  return `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const formatPercent = (v) => {
@@ -32,12 +56,21 @@ const renderChange = (v) => {
   );
 };
 
-const TopCryptoTable = ({ onCryptoSelect }) => {
+const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
+  const navigate = useNavigate();
   const [coins, setCoins] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(initialPage);
+  const [total, setTotal] = useState(TOTAL_COINS);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Update URL when page changes
+  useEffect(() => {
+    if (page !== initialPage) {
+      navigate(`/cryptocurrency?page=${page}`, { replace: true });
+    }
+  }, [page, navigate, initialPage]);
 
   useEffect(() => {
     let mounted = true;
@@ -45,11 +78,45 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch top coins by market cap from backend (cached, avoids CoinGecko 429)
-        const res = await fetch(`http://localhost:4001/api/crypto/list?page=${page}&limit=${PAGE_SIZE}`);
-        if (!res.ok) throw new Error('Backend API error');
+        // Check localStorage cache first (2 minute cache)
+        const allCoinsCacheKey = 'top_crypto_all_coins';
+        const cachedData = localStorage.getItem(allCoinsCacheKey);
+        let processedCoins = [];
+        
+        if (cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData);
+            const age = Date.now() - parsed.timestamp;
+            if (age < 120000) { // 2 minutes
+              console.log('[TopCryptoTable] Using cached data');
+              processedCoins = parsed.coins;
+              if (mounted) {
+                const startIdx = (page - 1) * PAGE_SIZE;
+                const endIdx = startIdx + PAGE_SIZE;
+                const pagedCoins = processedCoins.slice(startIdx, endIdx);
+                setCoins(pagedCoins);
+                setTotal(processedCoins.length);
+                setLoading(false);
+              }
+              return;
+            }
+          } catch (e) {
+            console.warn('[TopCryptoTable] Cache parse error:', e);
+            localStorage.removeItem(allCoinsCacheKey);
+          }
+        }
+        
+        // Always fetch the top 50 coins (page 1) to match CoinGecko exactly
+        const res = await fetch(`http://localhost:4001/api/crypto/list?page=1&limit=${TOTAL_COINS}`);
+        
+        if (!res.ok) {
+          if (res.status === 429) {
+            throw new Error('Rate limit reached. Please wait a moment.');
+          }
+          throw new Error(`API Error: ${res.status}`);
+        }
         const data = await res.json();
-        const coinsWithImages = (data.cryptos || []).map(cg => ({
+        processedCoins = (data.cryptos || []).map(cg => ({
           id: cg.id,
           symbol: cg.symbol?.toUpperCase() || '',
           name: cg.name || cg.symbol?.toUpperCase() || '',
@@ -63,11 +130,52 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
           quoteVolume: typeof cg.volume24h === 'number' ? cg.volume24h : null,
           raw: cg,
         }));
+        
         if (!mounted) return;
-        setCoins(coinsWithImages);
-        setTotal(data.count || 1000);
+        
+        // Cache all coins for future use
+        try {
+          localStorage.setItem(allCoinsCacheKey, JSON.stringify({
+            coins: processedCoins,
+            timestamp: Date.now(),
+            total: processedCoins.length
+          }));
+        } catch (e) {
+          console.warn('[TopCryptoTable] Failed to cache all coins:', e);
+        }
+        
+        // Paginate the coins for display
+        const startIdx = (page - 1) * PAGE_SIZE;
+        const endIdx = startIdx + PAGE_SIZE;
+        const pagedCoins = processedCoins.slice(startIdx, endIdx);
+        
+        setCoins(pagedCoins);
+        setTotal(processedCoins.length);
       } catch (err) {
         if (!mounted) return;
+        console.error('[TopCryptoTable] Error:', err);
+        
+        // Try to use any cached data (even stale) on error
+        const allCoinsCache = localStorage.getItem('top_crypto_all_coins');
+        if (allCoinsCache) {
+          try {
+            const parsed = JSON.parse(allCoinsCache);
+            const startIdx = (page - 1) * PAGE_SIZE;
+            const endIdx = startIdx + PAGE_SIZE;
+            const pagedCoins = parsed.coins.slice(startIdx, endIdx);
+            
+            if (pagedCoins.length > 0) {
+              setCoins(pagedCoins);
+              setTotal(parsed.total || parsed.coins.length);
+              setError('Using cached data (network error: ' + err.message + ')');
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('[TopCryptoTable] Could not use cached data:', e);
+          }
+        }
+        
         setError('Failed to load data: ' + err.message);
         setCoins([]);
       } finally {
@@ -77,10 +185,17 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
     };
 
     fetchCoins();
-    const interval = setInterval(fetchCoins, 30000);
+    // Refresh every 2 minutes instead of 30 seconds to avoid rate limits
+    const interval = setInterval(fetchCoins, 120000);
     return () => { mounted = false; clearInterval(interval); };
-  }, [page]);
+  }, [page, retryCount]);
+  
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  
+  const handleRetry = () => {
+    setError(null);
+    setRetryCount(prev => prev + 1);
+  };
 
   return (
     <div className="card_app_wrapper">
@@ -114,17 +229,147 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
               <div className="text-size-small text-weight-semibold">Market Cap</div>
             </div>
           </div>
-          {loading ? (
-            <div style={{ padding: 24, textAlign: 'center', width: '100%' }}>Loading...</div>
-          ) : error ? (
-            <div style={{ padding: 24, color: 'red', textAlign: 'center', width: '100%' }}>{error}</div>
+          {loading && coins.length === 0 ? (
+            <>
+              {[...Array(PAGE_SIZE)].map((_, idx) => (
+                <div key={idx} className="card_app_top_row skeleton-row">
+                  <div className="card_app_top_text_wrapper">
+                    <div className="skeleton" style={{ width: '24px', height: '16px' }} />
+                  </div>
+                  <div className="card_app_top_text_wrapper">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                      <div className="skeleton" style={{ width: '100px', height: '16px' }} />
+                    </div>
+                  </div>
+                  <div className="card_app_top_text_wrapper align-left">
+                    <div className="skeleton" style={{ width: '80px', height: '16px' }} />
+                  </div>
+                  <div className="card_app_top_text_wrapper align-left">
+                    <div className="skeleton" style={{ width: '50px', height: '16px' }} />
+                  </div>
+                  <div className="card_app_top_text_wrapper align-left">
+                    <div className="skeleton" style={{ width: '50px', height: '16px' }} />
+                  </div>
+                  <div className="card_app_top_text_wrapper align-left">
+                    <div className="skeleton" style={{ width: '50px', height: '16px' }} />
+                  </div>
+                  <div className="card_app_top_text_wrapper align-left">
+                    <div className="skeleton" style={{ width: '90px', height: '16px' }} />
+                  </div>
+                </div>
+              ))}
+              <style>{`
+                .skeleton-row {
+                  pointer-events: none;
+                }
+                
+                .skeleton {
+                  background: linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 20%, #f0f0f0 40%, #f0f0f0 100%);
+                  background-size: 200% 100%;
+                  animation: shimmer 1.5s ease-in-out infinite;
+                  border-radius: 4px;
+                  display: inline-block;
+                }
+                
+                @keyframes shimmer {
+                  0% {
+                    background-position: 200% 0;
+                  }
+                  100% {
+                    background-position: -200% 0;
+                  }
+                }
+              `}</style>
+            </>
+          ) : error && coins.length === 0 ? (
+            <div style={{ 
+              padding: 24, 
+              textAlign: 'center', 
+              width: '100%',
+              background: 'rgba(239, 83, 80, 0.1)',
+              borderRadius: '8px',
+              margin: '16px'
+            }}>
+              <div style={{ color: '#ef5350', marginBottom: '12px', fontWeight: 500 }}>⚠️ {error}</div>
+              <button 
+                onClick={handleRetry}
+                style={{
+                  padding: '8px 16px',
+                  background: '#ef5350',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '13px'
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : error && coins.length > 0 ? (
+            <>
+              <div style={{ 
+                padding: '12px 16px', 
+                background: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.3)',
+                borderRadius: '4px',
+                margin: '0 16px 8px',
+                color: '#ff9800',
+                fontSize: '13px'
+              }}>
+                ⚡ {error}
+              </div>
+              {coins.map((coin, idx) => (
+              <div
+                className="card_app_top_row is-main"
+                key={`${coin.id}-${coin.symbol}-${idx}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onCryptoSelect && onCryptoSelect(coin, page)}
+              >
+                <div className="card_app_top_text_wrapper">
+                  <div className="text-size-regular">{String((page - 1) * PAGE_SIZE + idx + 1).padStart(2, '0')}</div>
+                </div>
+                <div className="card_app_top_text_wrapper">
+                  {coin.image && (
+                    <img
+                      src={coin.image}
+                      alt={coin.name}
+                      loading="lazy"
+                      className="card_app_top_icon"
+                      style={{ width: 32, height: 32, marginRight: 8, objectFit: 'contain', borderRadius: '50%' }}
+                    />
+                  )}
+                  <div className="text-size-regular">{coin.name}</div>
+                </div>
+                <div className="card_app_top_text_wrapper align-left">
+                  <div className="text-size-regular">{formatCurrency(coin.lastPrice)}</div>
+                </div>
+                {/* 1h change (not available) */}
+                <div className="card_app_top_text_wrapper align-left">
+                  {coin.priceChange1h !== null && coin.priceChange1h !== undefined ? renderChange(coin.priceChange1h) : <span className="text-size-regular">—</span>}
+                </div>
+                {/* 24h change */}
+                <div className="card_app_top_text_wrapper align-left">
+                  {coin.priceChange24h !== null && coin.priceChange24h !== undefined ? renderChange(coin.priceChange24h) : <span className="text-size-regular">—</span>}
+                </div>
+                {/* 7d change (not available) */}
+                <div className="card_app_top_text_wrapper align-left">
+                  {coin.priceChange7d !== null && coin.priceChange7d !== undefined ? renderChange(coin.priceChange7d) : <span className="text-size-regular">—</span>}
+                </div>
+                <div className="card_app_top_text_wrapper align-left">
+                  <div className="text-size-regular">{coin.marketCap !== null && coin.marketCap !== undefined ? formatCurrency(coin.marketCap) : '—'}</div>
+                </div>
+              </div>
+            ))}
+            </>
           ) : (
             coins.map((coin, idx) => (
               <div
                 className="card_app_top_row is-main"
                 key={`${coin.id}-${coin.symbol}-${idx}`}
                 style={{ cursor: 'pointer' }}
-                onClick={() => onCryptoSelect && onCryptoSelect(coin)}
+                onClick={() => onCryptoSelect && onCryptoSelect(coin, page)}
               >
                 <div className="card_app_top_text_wrapper">
                   <div className="text-size-regular">{String((page - 1) * PAGE_SIZE + idx + 1).padStart(2, '0')}</div>
@@ -166,14 +411,14 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
       </div>
       <div className="card_app_footer">
         <div className="card_app_pagination_wrapper">
-          <div className="card_app_pagination_text">
-            <div className="text-size-small text-color-secondary">Showing</div>
-            <div className="text-size-small text-color-secondary">{total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}</div>
-            <div className="text-size-small text-color-secondary">to</div>
-            <div className="text-size-small text-color-secondary">{Math.min(page * PAGE_SIZE, total)}</div>
-            <div className="text-size-small text-color-secondary">of</div>
-            <div className="text-size-small text-color-secondary">{total}</div>
-          </div>
+            <div className="card_app_pagination_text">
+              <div className="text-size-small text-color-secondary">Showing</div>
+              <div className="text-size-small text-color-secondary">{total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}</div>
+              <div className="text-size-small text-color-secondary">to</div>
+              <div className="text-size-small text-color-secondary">{Math.min(page * PAGE_SIZE, total)}</div>
+              <div className="text-size-small text-color-secondary">of</div>
+              <div className="text-size-small text-color-secondary">{total}</div>
+            </div>
           <div className="card_app_pagination">
             <button
               className="card_app_pagination_link w-inline-block"
@@ -184,31 +429,41 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
               <svg width="7" height="12" viewBox="0 0 7 10" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.40482 10.75L0.994071 6.33926C0.668635 6.01382 0.668635 5.48618 0.994071 5.16074L5.40482 0.75" stroke="currentcolor" strokeWidth="1.5" strokeLinecap="round"></path></svg>
             </button>
             <div className="card_app_pagination_link_flex">
-              {Array.from({ length: Math.min(totalPages, 6) }, (_, i) => {
-                let pageNum = i + 1;
-                if (page > 3 && totalPages > 6) {
-                  if (i === 0) pageNum = 1;
-                  else if (i === 1) pageNum = page - 1;
-                  else if (i === 2) pageNum = page;
-                  else if (i === 3) pageNum = page + 1;
-                  else if (i === 4) pageNum = totalPages;
-                  else pageNum = '...';
+              {(() => {
+                const pages = [];
+                
+                if (totalPages <= 5) {
+                  // Show all pages if 5 or fewer
+                  for (let i = 1; i <= totalPages; i++) {
+                    pages.push(i);
+                  }
+                } else if (page <= 3) {
+                  // Near start: show 1, 2, 3, ..., last
+                  pages.push(1, 2, 3, '...', totalPages);
+                } else if (page >= totalPages - 2) {
+                  // Near end: show 1, ..., last-2, last-1, last
+                  pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
+                } else {
+                  // Middle: show 1, ..., current, ..., last
+                  pages.push(1, '...', page, '...', totalPages);
                 }
-                if (pageNum > totalPages) return null;
-                if (pageNum === '...') {
-                  return <span key={i} className="card_app_pagination_link w-inline-block">...</span>;
-                }
-                return (
-                  <button
-                    key={i}
-                    className={`card_app_pagination_link w-inline-block${pageNum === page ? ' is-active' : ''}`}
-                    onClick={() => setPage(pageNum)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                  >
-                    <div>{pageNum}</div>
-                  </button>
-                );
-              })}
+                
+                return pages.map((pageNum, i) => {
+                  if (pageNum === '...') {
+                    return <span key={`dots-${i}`} className="card_app_pagination_link w-inline-block" style={{ cursor: 'default' }}>...</span>;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`card_app_pagination_link w-inline-block${pageNum === page ? ' is-active' : ''}`}
+                      onClick={() => setPage(pageNum)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      <div>{pageNum}</div>
+                    </button>
+                  );
+                });
+              })()}
             </div>
             <button
               className="card_app_pagination_link w-inline-block"
@@ -221,6 +476,13 @@ const TopCryptoTable = ({ onCryptoSelect }) => {
           </div>
         </div>
       </div>
+      
+      <style>{`
+        .card_app_top_row.is-main:hover {
+          background-color: #ecf4fc;
+          transition: background-color 0.2s ease;
+        }
+      `}</style>
     </div>
   );
 };

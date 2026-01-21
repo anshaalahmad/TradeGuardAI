@@ -15,13 +15,37 @@ const cache = new NodeCache({
   deleteOnExpire: true
 });
 
+// Create a longer-lived stale cache for rate limit fallback
+const staleCache = new NodeCache({
+  stdTTL: 3600, // Keep stale data for 1 hour
+  checkperiod: 600,
+  useClones: false
+});
+
 /**
  * Get a value from cache
  * @param {string} key - Cache key
+ * @param {boolean} allowStale - Allow returning expired values from stale cache
  * @returns {any} Cached value or undefined
  */
-function get(key) {
-  return cache.get(key);
+function get(key, allowStale = false) {
+  const value = cache.get(key);
+  
+  // If value exists in main cache, return it
+  if (value !== undefined) {
+    return value;
+  }
+  
+  // If allowStale is true, try stale cache
+  if (allowStale) {
+    const staleValue = staleCache.get(key);
+    if (staleValue !== undefined) {
+      console.log(`[Cache] Returning stale data for key: ${key}`);
+      return staleValue;
+    }
+  }
+  
+  return undefined;
 }
 
 /**
@@ -32,6 +56,8 @@ function get(key) {
  * @returns {boolean} Success status
  */
 function set(key, value, ttl = undefined) {
+  // Store in both main cache and stale cache
+  staleCache.set(key, value, 3600); // Keep in stale cache for 1 hour
   return cache.set(key, value, ttl);
 }
 

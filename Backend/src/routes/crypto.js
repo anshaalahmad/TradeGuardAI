@@ -111,32 +111,113 @@ router.get('/logo/:symbol', async (req, res, next) => {
 });
 
 /**
- * @route   GET /api/crypto/:symbol
- * @desc    Get details for a specific cryptocurrency
+ * @route   GET /api/crypto/orderbook
+ * @desc    Get order book for a trading pair
  * @access  Public
+ * @query   symbol (required), limit (default: 20)
  */
-router.get('/:symbol', async (req, res, next) => {
+router.get('/orderbook', async (req, res, next) => {
   try {
-    const { symbol } = req.params;
-    const upperSymbol = symbol.toUpperCase();
+    const { symbol } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 5000);
     
-    const cacheKey = `crypto_${upperSymbol}`;
+    if (!symbol) {
+      return res.status(400).json({ error: 'Symbol parameter is required' });
+    }
+    
+    const upperSymbol = symbol.toUpperCase();
+    const cacheKey = `orderbook_${upperSymbol}_${limit}`;
     const cached = cache.get(cacheKey);
     
     if (cached) {
       return res.json({ ...cached, cached: true });
     }
     
-    // Get data from both Binance and CoinGecko
-    const [binanceData, geckoData] = await Promise.allSettled([
-      binanceService.getSymbolPrice(`${upperSymbol}USDT`),
-      coingeckoService.getCryptoDetails(upperSymbol)
-    ]);
+    const data = await binanceService.getOrderBook(upperSymbol, limit);
+    
+    // Cache orderbook for 2 seconds (very short-lived data)
+    cache.set(cacheKey, data, 2);
+    
+    res.json({ ...data, cached: false });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/crypto/trades
+ * @desc    Get recent trades for a trading pair
+ * @access  Public
+ * @query   symbol (required), limit (default: 50)
+ */
+router.get('/trades', async (req, res, next) => {
+  try {
+    const { symbol } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 1000);
+    
+    if (!symbol) {
+      return res.status(400).json({ error: 'Symbol parameter is required' });
+    }
+    
+    const upperSymbol = symbol.toUpperCase();
+    const cacheKey = `trades_${upperSymbol}_${limit}`;
+    const cached = cache.get(cacheKey);
+    
+    if (cached) {
+      return res.json({ ...cached, cached: true });
+    }
+    
+    const data = await binanceService.getRecentTrades(upperSymbol, limit);
+    
+    // Cache trades for 2 seconds (very short-lived data)
+    cache.set(cacheKey, data, 2);
+    
+    res.json({ ...data, cached: false });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/crypto/:coinId
+ * @desc    Get details for a specific cryptocurrency by CoinGecko ID
+ * @access  Public
+ */
+router.get('/:coinId', async (req, res, next) => {
+  try {
+    const { coinId } = req.params;
+    // Keep original casing for CoinGecko IDs (they are lowercase like 'bitcoin', 'ethereum')
+    const lowerCoinId = coinId.toLowerCase();
+    
+    const cacheKey = `crypto_${lowerCoinId}`;
+    const cached = cache.get(cacheKey);
+    
+    if (cached) {
+      return res.json({ ...cached, cached: true });
+    }
+    
+    // Get data directly from CoinGecko using the coin ID
+    let geckoData;
+    try {
+      geckoData = await coingeckoService.getCryptoDetailsById(lowerCoinId);
+    } catch (error) {
+      // If rate limited and we have no cache, try to return stale cache with longer TTL
+      if (error.status === 429) {
+        // Check for any stale cache (even expired)
+        const staleCache = cache.get(cacheKey, true);
+        if (staleCache) {
+          console.log(`[Rate Limited] Serving stale cache for ${lowerCoinId}`);
+          // Extend cache for another 10 minutes
+          cache.set(cacheKey, staleCache, 600);
+          return res.json({ ...staleCache, cached: true, stale: true });
+        }
+      }
+      throw error;
+    }
     
     // Flatten CoinGecko details for frontend compatibility
-    let details = geckoData.status === 'fulfilled' ? geckoData.value : {};
-    let market = details.marketData || {};
-    let links = details.links || {};
+    let market = geckoData.marketData || {};
+    let links = geckoData.links || {};
     // Calculate 7d range if possible
     let high7d = null, low7d = null;
     if (Array.isArray(market.high7d) && market.high7d.length) high7d = Math.max(...market.high7d);
@@ -146,16 +227,17 @@ router.get('/:symbol', async (req, res, next) => {
     low7d = low7d || market.low24h;
     // Use new maxSupply and fullyDilutedValuation fields from CoinGecko marketData
     const data = {
-      symbol: upperSymbol,
-      name: details.name,
-      image: details.image,
-      description: details.description,
+      symbol: geckoData.symbol,
+      name: geckoData.name,
+      image: geckoData.image,
+      description: geckoData.description,
       marketCap: market.marketCap,
       fullyDilutedValuation: market.fullyDilutedValuation,
       volume24h: market.volume24h,
       circulatingSupply: market.circulatingSupply,
       totalSupply: market.totalSupply,
       maxSupply: market.maxSupply,
+      treasury: market.treasury,
       currentPrice: market.currentPrice,
       high24h: market.high24h,
       low24h: market.low24h,
@@ -167,9 +249,12 @@ router.get('/:symbol', async (req, res, next) => {
       atl: market.atl,
       atlDate: market.atlDate,
       atlChangePercentage: market.atlChangePercentage,
+      priceChangePercent1h: market.priceChangePercent1h,
       priceChangePercent24h: market.priceChangePercent24h,
       priceChangePercent7d: market.priceChangePercent7d,
+      priceChangePercent14d: market.priceChangePercent14d,
       priceChangePercent30d: market.priceChangePercent30d,
+      priceChangePercent1y: market.priceChangePercent1y,
       marketCapRank: market.marketCapRank,
       links: {
         homepage: links.homepage ? [links.homepage] : [],
@@ -181,7 +266,8 @@ router.get('/:symbol', async (req, res, next) => {
       },
       timestamp: new Date().toISOString()
     };
-    cache.set(cacheKey, data, process.env.CACHE_TTL_CRYPTO_DETAILS || 60);
+    // Increase cache to 5 minutes (300s) to reduce rate limit issues
+    cache.set(cacheKey, data, process.env.CACHE_TTL_CRYPTO_DETAILS || 300);
     res.json({ ...data, cached: false });
   } catch (error) {
     next(error);

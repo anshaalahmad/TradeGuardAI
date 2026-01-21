@@ -1,0 +1,39 @@
+/* Responsive fixes for TradeGuard AI */
+
+/* Ensure forms don't overlap with fixed navbar on small screens */
+@media screen and (max-width: 767px) {
+  .padding-full-height {
+    min-height: calc(100vh - 4rem);
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+  
+  /* Adjust form wrapper padding on mobile */
+  .main_form_wrapper {
+    min-height: 100vh;
+  }
+  
+  /* Ensure form content is properly sized on mobile */
+  .main_form_block {
+    padding: 1rem;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Adjust modal wrapper for better mobile display */
+  .ms-form {
+    padding: 1.5rem;
+    width: 100%;
+  }
+}
+
+@media screen and (min-width: 768px) and (max-width: 991px) {
+  .padding-full-height {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+  
+  .main_form_block {
+    padding: 2rem;
+  }
+}
