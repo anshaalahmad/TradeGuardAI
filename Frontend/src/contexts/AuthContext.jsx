@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import memberstack from '../lib/memberstack';
 
 export const AuthContext = createContext();
+
+// Get admin emails from environment variable
+const getAdminEmails = () => {
+  const adminEmailsStr = import.meta.env.VITE_ADMIN_EMAILS || '';
+  return adminEmailsStr.split(',').map(email => email.trim().toLowerCase()).filter(Boolean);
+};
 
 export function AuthProvider({ children }) {
   const [member, setMember] = useState(null);
@@ -204,11 +210,19 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Check if current user is an admin based on email whitelist
+  const isAdmin = useMemo(() => {
+    if (!member?.auth?.email) return false;
+    const adminEmails = getAdminEmails();
+    return adminEmails.includes(member.auth.email.toLowerCase());
+  }, [member]);
+
   const value = {
     member,
     loading,
     error,
     isAuthenticated: !!member,
+    isAdmin,
     memberstack,
     // Auth methods
     login,

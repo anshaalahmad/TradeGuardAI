@@ -127,26 +127,90 @@ model PredictionResult {
 }
 
 // ============================================
-// FUTURE: Resources & Educational Content
+// RESOURCES: Educational Content
 // ============================================
 
-/// Educational resources and articles
-model Resource {
+/// Learning articles with video content (blogs)
+model LearningArticle {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   title        String
   slug         String    @unique
-  category     String    // e.g., "guides", "analysis", "news"
-  content      String
-  excerpt      String?
-  thumbnailUrl String?
+  excerpt      String    // Short preview text
+  content      String    // Full article content (markdown/HTML)
+  youtubeUrl   String?   // YouTube video embed URL
+  thumbnailUrl String?   // Article thumbnail image
+  category     String    // e.g., "beginner", "technical-analysis", "trading-strategies", "market-analysis"
+  tags         String[]  // Array of tags for filtering
+  readTime     Int       // Estimated read time in minutes
   authorName   String?
+  authorAvatar String?
+  difficulty   String    @default("beginner") // beginner, intermediate, advanced
   published    Boolean   @default(false)
+  featured     Boolean   @default(false) // Show on featured section
+  viewCount    Int       @default(0)
   publishedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([category])
   @@index([published])
+  @@index([featured])
+  @@index([difficulty])
+}
+
+/// Chart patterns with images and explanations
+model ChartPattern {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  slug         String   @unique
+  imageUrl     String   // Pattern image URL
+  description  String   // Full description/explanation
+  excerpt      String   // Short preview text
+  patternType  String   // bullish, bearish, continuation, reversal
+  difficulty   String   @default("beginner") // beginner, intermediate, advanced
+  keyPoints    String[] // Array of key learning points
+  howToTrade   String?  // Trading strategy for this pattern
+  examples     String[] // Array of real-world example image URLs
+  reliability  String   @default("medium") // low, medium, high
+  published    Boolean  @default(false)
+  viewCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([patternType])
+  @@index([difficulty])
+  @@index([published])
+}
+
+/// User bookmarks for articles and patterns
+model UserBookmark {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  memberstackId String       // Reference to Memberstack user
+  resourceType  ResourceType // article or pattern
+  resourceId    String       @db.ObjectId // ID of the bookmarked resource
+  addedAt       DateTime     @default(now())
+
+  @@unique([memberstackId, resourceType, resourceId])
+  @@index([memberstackId])
+  @@index([resourceType])
+}
+
+enum ResourceType {
+  ARTICLE
+  PATTERN
+}
+
+/// User reading progress (optional - tracks which articles have been read)
+model ReadingProgress {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  memberstackId String
+  articleId     String   @db.ObjectId
+  completed     Boolean  @default(false)
+  progress      Int      @default(0) // Percentage 0-100
+  lastReadAt    DateTime @default(now())
+
+  @@unique([memberstackId, articleId])
+  @@index([memberstackId])
 }
 
 // ============================================
@@ -194,4 +258,28 @@ model PriceAlert {
 enum AlertCondition {
   ABOVE
   BELOW
+}
+
+// ============================================
+// ADMIN: Audit Logging
+// ============================================
+
+/// Tracks all admin actions for accountability
+model AdminAuditLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  adminEmail  String   // Email of admin who performed action
+  adminId     String   // Memberstack ID of admin
+  action      String   // CREATE, UPDATE, DELETE
+  targetType  String   // USER, ARTICLE, PATTERN
+  targetId    String   // ID of affected resource
+  targetName  String   // Name/title for display
+  changes     Json?    // { before: {...}, after: {...} }
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminEmail])
+  @@index([targetType])
+  @@index([action])
+  @@index([createdAt])
 }

@@ -11,6 +11,22 @@ const cryptoRoutes = require('./routes/crypto');
 const marketRoutes = require('./routes/market');
 const healthRoutes = require('./routes/health');
 
+// Import resources routes (ES Module)
+let resourcesRoutes;
+import('./routes/resources.mjs').then(module => {
+  resourcesRoutes = module.default;
+}).catch(err => {
+  console.error('Failed to load resources routes:', err);
+});
+
+// Import admin routes (ES Module)
+let adminRoutes;
+import('./routes/admin.mjs').then(module => {
+  adminRoutes = module.default;
+}).catch(err => {
+  console.error('Failed to load admin routes:', err);
+});
+
 // CoinGecko Proxy Integration
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
@@ -25,7 +41,7 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Email', 'X-Admin-Id']
 }));
 
 // Rate limiting
@@ -54,6 +70,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/health', healthRoutes);
 app.use('/api/crypto', cryptoRoutes);
 app.use('/api/market', marketRoutes);
+
+// Resources routes (loaded dynamically as ES Module)
+app.use('/api/resources', (req, res, next) => {
+  if (resourcesRoutes) {
+    return resourcesRoutes(req, res, next);
+  }
+  res.status(503).json({ error: 'Resources service is loading, please try again' });
+});
+
+// Admin routes (loaded dynamically as ES Module)
+app.use('/api/admin', (req, res, next) => {
+  if (adminRoutes) {
+    return adminRoutes(req, res, next);
+  }
+  res.status(503).json({ error: 'Admin service is loading, please try again' });
+});
 
 // Proxy /api/coingecko/* to CoinGecko API
 app.use(
@@ -89,7 +121,15 @@ app.use((req, res) => {
       'GET /api/crypto/:symbol',
       'GET /api/crypto/logo/:symbol',
       'GET /api/market/summary',
-      'GET /api/market/fear-greed'
+      'GET /api/market/fear-greed',
+      'GET /api/resources/articles',
+      'GET /api/resources/articles/:slug',
+      'GET /api/resources/patterns',
+      'GET /api/resources/patterns/:slug',
+      'GET /api/resources/search?q=query',
+      'GET /api/resources/bookmarks/:memberstackId',
+      'POST /api/resources/bookmarks',
+      'DELETE /api/resources/bookmarks'
     ]
   });
 });

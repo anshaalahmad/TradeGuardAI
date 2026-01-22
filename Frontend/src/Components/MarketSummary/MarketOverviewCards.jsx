@@ -208,10 +208,15 @@ const MarketOverviewCards = () => {
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="card_main_wrapper is-small skeleton-card">
               <div className="card_main_content">
-                <div className="skeleton skeleton-box" style={{ width: '120px', height: '20px', marginBottom: '8px' }} />
-                <div className="skeleton skeleton-box" style={{ width: '90px', height: '24px' }} />
+                <div className="card_main_flex" style={{ marginBottom: '1rem' }}>
+                  <div className="card_main_text_wrapper is-centered">
+                    <div className="skeleton skeleton-box" style={{ width: '80px', height: '16px', marginBottom: '8px' }} />
+                    <div className="skeleton skeleton-box" style={{ width: '100px', height: '24px' }} />
+                  </div>
+                  <div className="skeleton skeleton-box" style={{ width: '60px', height: '24px', borderRadius: '12px' }} />
+                </div>
+                <div className="skeleton skeleton-chart" style={{ height: '60px', borderRadius: '4px' }} />
               </div>
-              <div className="skeleton skeleton-chart" style={{ height: '60px', margin: '16px', borderRadius: '4px' }} />
             </div>
           ))}
         </div>
@@ -219,6 +224,7 @@ const MarketOverviewCards = () => {
         <style>{`
           .skeleton-card {
             pointer-events: none;
+            min-height: 180px;
           }
           
           .skeleton {
