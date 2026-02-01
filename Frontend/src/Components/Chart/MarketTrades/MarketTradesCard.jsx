@@ -24,7 +24,11 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
       // Fetch initial trades from backend proxy
       const fetchInitialTrades = async (retryCount = 0) => {
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/trades?symbol=${symbol}&limit=${maxTrades}`);
+          const getApiBaseUrl = () => {
+            const viteUrl = import.meta.env.VITE_API_URL;
+            return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+          };
+          const response = await fetch(`${getApiBaseUrl()}/api/crypto/trades?symbol=${symbol}&limit=${maxTrades}`);
           
           if (!response.ok) {
             // Handle rate limiting with retry

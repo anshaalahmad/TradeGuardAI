@@ -10,7 +10,11 @@ import { apiRequest, getAccessToken } from '../services/api'
 import Sidebar from '../Components/Dashboard Pages/Sidebar'
 import Navbar from '../Components/Dashboard Pages/Navbar'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const getApiBaseUrl = () => {
+  const viteUrl = import.meta.env.VITE_API_URL;
+  return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+};
+const API_BASE_URL = getApiBaseUrl()
 
 // Pattern type configuration with colors
 const PATTERN_TYPES = [

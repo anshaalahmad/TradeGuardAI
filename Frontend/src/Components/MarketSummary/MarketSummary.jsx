@@ -128,7 +128,11 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
           throw new Error('Could not resolve CoinGecko ID from props');
         }
         
-        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/${resolvedCgId}`;
+        const getApiBaseUrl = () => {
+          const viteUrl = import.meta.env.VITE_API_URL;
+          return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+        };
+        const apiUrl = `${getApiBaseUrl()}/api/crypto/${resolvedCgId}`;
         setDebugInfo(prev => ({ ...prev, apiUrl }));
         
         const cgRes = await fetch(apiUrl);

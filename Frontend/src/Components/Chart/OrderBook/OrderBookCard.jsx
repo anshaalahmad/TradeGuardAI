@@ -58,7 +58,11 @@ function OrderBookCard({
         try {
           // Use backend proxy to avoid CORS
           const response = await fetch(
-            `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/orderbook?symbol=${symbol}`
+            (() => {
+              const viteUrl = import.meta.env.VITE_API_URL;
+              const baseUrl = viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+              return `${baseUrl}/api/crypto/orderbook?symbol=${symbol}`;
+            })()
           );
           
           if (!response.ok) {

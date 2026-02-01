@@ -103,7 +103,11 @@ export default function DashboardApp() {
     const fetchPriceChanges = async () => {
       try {
         const coinId = selectedCrypto.id || selectedCrypto.symbol.toLowerCase();
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/${coinId}`);
+        const getApiBaseUrl = () => {
+          const viteUrl = import.meta.env.VITE_API_URL;
+          return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+        };
+        const response = await fetch(`${getApiBaseUrl()}/api/crypto/${coinId}`);
         
         if (!response.ok) {
           // If rate limited or error, keep existing values (don't reset to 0)

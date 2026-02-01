@@ -926,3 +926,37 @@ body {
     justify-content: center;
   }
 }
+
+/* ============================================
+   Mobile Navbar Styles
+   ============================================ */
+
+/* Mobile menu visibility */
+@media screen and (max-width: 991px) {
+  .w-nav[data-collapse='medium'] .w-nav-menu {
+    display: none;
+  }
+  
+  .w-nav[data-collapse='medium'] .w-nav-menu[data-nav-menu-open] {
+    display: block !important;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    z-index: 9999;
+  }
+
+  .w-nav[data-collapse='medium'] .w-nav-button {
+    display: block;
+  }
+
+  .navbar_menu-button {
+    display: flex !important;
+  }
+
+  .navbar_menu.w--open[data-nav-menu-open] {
+    display: flex !important;
+    flex-direction: column;
+  }
+}

@@ -74,7 +74,11 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
         }
         
         // Always fetch the top 50 coins (page 1) to match CoinGecko exactly
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/list?page=1&limit=${TOTAL_COINS}`);
+        const getApiBaseUrl = () => {
+          const viteUrl = import.meta.env.VITE_API_URL;
+          return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+        };
+        const res = await fetch(`${getApiBaseUrl()}/api/crypto/list?page=1&limit=${TOTAL_COINS}`);
         
         if (!res.ok) {
           if (res.status === 429) {

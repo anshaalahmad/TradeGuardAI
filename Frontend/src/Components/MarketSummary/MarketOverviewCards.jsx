@@ -23,7 +23,11 @@ const MarketOverviewCards = () => {
       setError(null);
       
       // Fetch Bitcoin, Ethereum, and Solana data from backend
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const getApiBaseUrl = () => {
+        const viteUrl = import.meta.env.VITE_API_URL;
+        return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+      };
+      const API_BASE = getApiBaseUrl();
       const cryptoPromises = [
         fetch(`${API_BASE}/api/crypto/bitcoin`).then(res => res.ok ? res.json() : null).catch(() => null),
         fetch(`${API_BASE}/api/crypto/ethereum`).then(res => res.ok ? res.json() : null).catch(() => null),

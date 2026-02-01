@@ -3,9 +3,18 @@
  * Handles authentication, token refresh, and request/response interceptors
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL === 'RUNTIME_ORIGIN' 
-  ? window.location.origin 
-  : import.meta.env.VITE_API_URL || 'http://localhost:5000';
+/**
+ * Get API base URL - centralized logic for all API calls
+ */
+export const getApiBaseUrl = () => {
+  const viteUrl = import.meta.env.VITE_API_URL;
+  if (viteUrl === 'RUNTIME_ORIGIN') {
+    return ''; // Empty string = relative URLs (same origin)
+  }
+  return viteUrl || 'http://localhost:5000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'accessToken';

@@ -44,14 +44,18 @@ const Navbar = () => {
           <Link to="/" className="navbar_logo-link w-nav-brand">
             <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/69426dffe6149e1de06911c1_Group%204%20(1).svg" loading="lazy" alt="TradeGuard AI" className="navbar_logo" />
           </Link>
-          <nav role="navigation" className={`navbar_menu is-page-height-tablet w-nav-menu ${isMenuOpen ? 'w--open' : ''}`}>
-            <Link to="/" className="navbar_link w-nav-link">
+          <nav 
+            role="navigation" 
+            className={`navbar_menu is-page-height-tablet w-nav-menu ${isMenuOpen ? 'w--open' : ''}`}
+            {...(isMenuOpen && { 'data-nav-menu-open': '' })}
+          >
+            <Link to="/" className="navbar_link w-nav-link" onClick={() => setIsMenuOpen(false)}>
               Home
             </Link>
-            <Link to="/resources" className="navbar_link w-nav-link">
+            <Link to="/resources" className="navbar_link w-nav-link" onClick={() => setIsMenuOpen(false)}>
               Resources
             </Link>
-            <Link to="/contact" className="navbar_link w-nav-link">
+            <Link to="/contact" className="navbar_link w-nav-link" onClick={() => setIsMenuOpen(false)}>
               Contact
             </Link>
             <div className="navbar_menu-buttons">
@@ -63,6 +67,7 @@ const Navbar = () => {
                   to="/dashboard"
                   className="button w-button"
                   style={{ cursor: 'pointer' }}
+                  onClick={() => setIsMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
@@ -71,20 +76,20 @@ const Navbar = () => {
                   {isOnAuthPage ? (
                     // On login/signup pages, use Link navigation instead of popups
                     <>
-                      <Link to="/signup" className="button w-button">
+                      <Link to="/signup" className="button w-button" onClick={() => setIsMenuOpen(false)}>
                         Sign up
                       </Link>
-                      <Link to="/login" className="button is-secondary w-button">
+                      <Link to="/login" className="button is-secondary w-button" onClick={() => setIsMenuOpen(false)}>
                         Log in
                       </Link>
                     </>
                   ) : (
                     // On other pages, show popups
                     <>
-                      <a onClick={() => setShowSignUp(true)} className="button w-button" style={{ cursor: 'pointer' }}>
+                      <a onClick={() => { setShowSignUp(true); setIsMenuOpen(false); }} className="button w-button" style={{ cursor: 'pointer' }}>
                         Sign up
                       </a>
-                      <a onClick={() => setShowLogin(true)} className="button is-secondary w-button" style={{ cursor: 'pointer' }}>
+                      <a onClick={() => { setShowLogin(true); setIsMenuOpen(false); }} className="button is-secondary w-button" style={{ cursor: 'pointer' }}>
                         Log in
                       </a>
                     </>
@@ -93,7 +98,12 @@ const Navbar = () => {
               )}
             </div>
           </nav>
-          <div className="navbar_menu-button w-nav-button" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          <div 
+            className={`navbar_menu-button w-nav-button ${isMenuOpen ? 'w--open' : ''}`} 
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="menu"
+            aria-expanded={isMenuOpen}
+          >
             <div className="menu-icon">
               <div className="menu-icon_line-top"></div>
               <div className="menu-icon_line-middle">
