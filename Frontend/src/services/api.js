@@ -3,7 +3,9 @@
  * Handles authentication, token refresh, and request/response interceptors
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL === 'RUNTIME_ORIGIN' 
+  ? window.location.origin 
+  : import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'accessToken';
