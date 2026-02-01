@@ -3,23 +3,23 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      nodejs: 18
+      nodejs: 20
     commands:
       - echo Installing dependencies...
   
   pre_build:
     commands:
       - echo Installing Frontend dependencies...
-      - cd Frontend && npm ci
+      - cd $CODEBUILD_SRC_DIR/Frontend && npm ci
       - echo Installing Backend dependencies...
-      - cd ../Backend && npm ci
+      - cd $CODEBUILD_SRC_DIR/Backend && npm ci
   
   build:
     commands:
       - echo Building Frontend...
-      - cd Frontend && npm run build
+      - cd $CODEBUILD_SRC_DIR/Frontend && npm run build
       - echo Generating Prisma client...
-      - cd ../Backend && npm run db:generate
+      - cd $CODEBUILD_SRC_DIR/Backend && npm run db:generate
   
   post_build:
     commands:
@@ -28,4 +28,6 @@ phases:
 artifacts:
   files:
     - '**/*'
-  discard-paths: no
+  exclude-paths:
+    - 'Frontend/node_modules/**/*'
+    - 'Backend/node_modules/**/*'

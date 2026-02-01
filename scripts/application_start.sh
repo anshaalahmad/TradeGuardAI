@@ -5,9 +5,18 @@ echo "=== Application Start ==="
 
 # Start Backend with PM2
 cd /var/www/tradeguard/Backend
+
+# Load environment variables
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
 pm2 delete tradeguard-api 2>/dev/null || true
-pm2 start src/server.js --name tradeguard-api
+pm2 start src/server.js --name tradeguard-api --update-env
 pm2 save
+
+# Setup PM2 to start on boot (run once)
+sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu 2>/dev/null || true
 
 # Configure Nginx to serve Frontend
 sudo tee /etc/nginx/sites-available/tradeguard > /dev/null <<EOF
