@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { apiRequest, getAccessToken } from '../services/api'
 import Sidebar from '../Components/Dashboard Pages/Sidebar'
 import Navbar from '../Components/Dashboard Pages/Navbar'
 
@@ -326,15 +327,15 @@ export default function BookmarksPage() {
   const [removingIds, setRemovingIds] = useState({})
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 })
   
-  const memberstackId = member?.id
+  const userId = member?.id
 
   // Counts
   const articleCount = bookmarks.filter(b => b.resourceType === 'ARTICLE').length
   const patternCount = bookmarks.filter(b => b.resourceType === 'PATTERN').length
 
-  // Fetch bookmarks
+  // Fetch bookmarks (requires authentication)
   const fetchBookmarks = useCallback(async () => {
-    if (!memberstackId) {
+    if (!userId || !getAccessToken()) {
       setLoading(false)
       return
     }
@@ -343,15 +344,7 @@ export default function BookmarksPage() {
     setError(null)
     
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/resources/bookmarks/${memberstackId}?limit=50`
-      )
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch bookmarks')
-      }
-      
-      const data = await response.json()
+      const data = await apiRequest('/api/resources/bookmarks?limit=50')
       
       if (data.success) {
         setBookmarks(data.data || [])
@@ -365,7 +358,7 @@ export default function BookmarksPage() {
     } finally {
       setLoading(false)
     }
-  }, [memberstackId])
+  }, [userId])
 
   // Initial load
   useEffect(() => {
@@ -382,25 +375,21 @@ export default function BookmarksPage() {
     setSearchParams(tab !== 'all' ? { type: tab } : {})
   }
 
-  // Handle remove bookmark
+  // Handle remove bookmark (requires authentication)
   const handleRemoveBookmark = async (bookmark) => {
     const key = `${bookmark.resourceType}_${bookmark.resourceId}`
     setRemovingIds(prev => ({ ...prev, [key]: true }))
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/resources/bookmarks`, {
+      await apiRequest('/api/resources/bookmarks', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberstackId,
           resourceType: bookmark.resourceType,
           resourceId: bookmark.resourceId
         })
       })
       
-      if (response.ok) {
-        setBookmarks(prev => prev.filter(b => b.id !== bookmark.id))
-      }
+      setBookmarks(prev => prev.filter(b => b.id !== bookmark.id))
     } catch (err) {
       console.error('Error removing bookmark:', err)
     } finally {

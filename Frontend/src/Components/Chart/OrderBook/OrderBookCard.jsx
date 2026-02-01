@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { isBinanceSymbolSupported } from '../../../utils/binanceSymbols';
 
 /**
@@ -10,7 +10,7 @@ import { isBinanceSymbolSupported } from '../../../utils/binanceSymbols';
  * - baseAsset: string - Base asset symbol for header (e.g., 'BTC', 'ETH')
  * - maxOrders: number - Number of buy/sell orders to display (default 11)
  */
-export default function OrderBookCard({
+function OrderBookCard({
   symbol = 'BTCUSDT',
   baseAsset = 'BTC',
   maxOrders = 11,
@@ -58,14 +58,13 @@ export default function OrderBookCard({
         try {
           // Use backend proxy to avoid CORS
           const response = await fetch(
-            `http://localhost:4001/api/crypto/orderbook?symbol=${symbol}`
+            `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/orderbook?symbol=${symbol}`
           );
           
           if (!response.ok) {
             // Handle rate limiting with retry
             if (response.status === 429 && retryCount < 3) {
               const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
-              console.warn(`[OrderBook] Rate limited, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
               await new Promise(resolve => setTimeout(resolve, delay));
               return fetchInitialOrderBook(retryCount + 1);
             }
@@ -78,7 +77,6 @@ export default function OrderBookCard({
           
           // Validate data structure
           if (!data || !Array.isArray(data.bids) || !Array.isArray(data.asks)) {
-            console.error('Invalid order book data structure:', data);
             throw new Error('Invalid order book data received');
           }
           
@@ -98,12 +96,10 @@ export default function OrderBookCard({
           }
           setLoading(false);
         } catch (error) {
-          console.error('Failed to fetch initial order book:', error);
           if (isSubscribed) {
             // If all retries failed, still proceed with WebSocket (it might work)
             setLoading(false);
             // Don't set wsError here - let WebSocket try to connect
-            console.warn('[OrderBook] Proceeding with WebSocket despite initial fetch failure');
           }
         }
       };
@@ -124,7 +120,6 @@ export default function OrderBookCard({
         ws.onopen = () => {
           reconnectAttemptsRef.current = 0;
           setWsError(false);
-          console.log('[OrderBookCard] WebSocket connected:', wsUrl);
         };
         ws.onmessage = (event) => {
           try {
@@ -155,23 +150,20 @@ export default function OrderBookCard({
               }
             }
           } catch (error) {
-            console.error('WebSocket message error:', error);
+            // WebSocket message parsing error - silently ignore
           }
         };
         ws.onerror = (error) => {
           setWsError(true);
-          console.error('[OrderBookCard] WebSocket error:', error, wsUrl);
         };
         ws.onclose = (event) => {
           if (!isSubscribed) return;
           if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttemptsRef.current++;
             const delay = 1000 * reconnectAttemptsRef.current;
-            console.warn(`[OrderBookCard] WebSocket closed. Reconnecting in ${delay}ms...`, wsUrl);
             reconnectTimeout = setTimeout(connectWS, delay);
           } else {
             setWsError(true);
-            console.error('[OrderBookCard] WebSocket failed after max attempts:', wsUrl);
           }
         };
       }
@@ -280,7 +272,7 @@ export default function OrderBookCard({
   return (
     <div className="card_app_wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="card_app_header" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color--border-primary)' }}>
+      <div className="card_app_header is-compact">
         <div className="text-size-medium text-weight-medium">Order Book</div>
       </div>
 
@@ -460,3 +452,5 @@ export default function OrderBookCard({
     </div>
   );
 }
+
+export default memo(OrderBookCard);

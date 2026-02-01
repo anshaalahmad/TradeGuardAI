@@ -10,7 +10,7 @@ export async function getBinanceSymbols() {
   }
   try {
     // Use backend proxy to avoid CORS
-    const res = await fetch('http://localhost:4001/api/crypto/binance-symbols');
+    const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/binance-symbols`);
     if (!res.ok) throw new Error('Failed to fetch Binance symbols');
     const data = await res.json();
     // Expecting { symbols: [ { symbol, baseAsset, quoteAsset, ... } ] }

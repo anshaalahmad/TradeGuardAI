@@ -73,8 +73,6 @@ const PatternFormPage = () => {
   const [error, setError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
-
   useEffect(() => {
     if (isEditing) {
       fetchPattern();
@@ -86,20 +84,8 @@ const PatternFormPage = () => {
       setFetching(true);
       setError(null);
 
-      const response = await fetch(`${API_URL}/api/admin/patterns/${id}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch pattern');
-      }
-
-      const result = await response.json();
+      const { getPattern } = await import('../../services/adminApi');
+      const result = await getPattern(id);
       const pattern = result.data || result;
       
       setFormData({
@@ -183,23 +169,12 @@ const PatternFormPage = () => {
         ...(isEditing && changeMessage.trim() && { changeMessage: changeMessage.trim() })
       };
 
-      const url = isEditing 
-        ? `${API_URL}/api/admin/patterns/${id}`
-        : `${API_URL}/api/admin/patterns`;
-
-      const response = await fetch(url, {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save pattern');
+      const { createPattern, updatePattern } = await import('../../services/adminApi');
+      
+      if (isEditing) {
+        await updatePattern(id, payload);
+      } else {
+        await createPattern(payload);
       }
 
       setSaveSuccess(true);

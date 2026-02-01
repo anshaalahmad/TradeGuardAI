@@ -5,11 +5,18 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const passport = require('passport');
+
+// Import Passport configuration
+const { configurePassport } = require('./config/passport');
 
 // Import routes
 const cryptoRoutes = require('./routes/crypto');
 const marketRoutes = require('./routes/market');
 const healthRoutes = require('./routes/health');
+const authRoutes = require('./routes/auth');
+const subscriptionRoutes = require('./routes/subscription');
 
 // Import resources routes (ES Module)
 let resourcesRoutes;
@@ -33,6 +40,9 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Configure Passport.js strategies
+configurePassport();
+
 // Security middleware
 app.use(helmet());
 
@@ -44,7 +54,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Email', 'X-Admin-Id']
 }));
 
-// Rate limiting
+// Cookie parser
+app.use(cookieParser());
+
+// Initialize Passport
+app.use(passport.initialize());
+
+// Rate limiting - general
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 100, // 100 requests per minute
@@ -55,6 +71,19 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// Rate limiting - auth endpoints (stricter)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 requests per 15 minutes
+  message: {
+    error: 'Too many authentication attempts, please try again later.',
+    retryAfter: 900
+  }
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+
 // Logging
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
@@ -63,13 +92,17 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Body parsing
+// NOTE: Stripe webhook needs raw body, so we handle it before JSON parsing
+app.use('/api/subscription/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // API Routes
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/crypto', cryptoRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Resources routes (loaded dynamically as ES Module)
 app.use('/api/resources', (req, res, next) => {
@@ -127,9 +160,19 @@ app.use((req, res) => {
       'GET /api/resources/patterns',
       'GET /api/resources/patterns/:slug',
       'GET /api/resources/search?q=query',
-      'GET /api/resources/bookmarks/:memberstackId',
+      'GET /api/resources/bookmarks/:userId',
       'POST /api/resources/bookmarks',
-      'DELETE /api/resources/bookmarks'
+      'DELETE /api/resources/bookmarks',
+      'POST /api/auth/register/init',
+      'POST /api/auth/register/verify',
+      'POST /api/auth/login',
+      'GET /api/auth/google',
+      'GET /api/auth/me',
+      'GET /api/subscription/plans',
+      'GET /api/subscription/status',
+      'POST /api/subscription/create-checkout-session',
+      'POST /api/subscription/create-portal-session',
+      'POST /api/subscription/cancel'
     ]
   });
 });

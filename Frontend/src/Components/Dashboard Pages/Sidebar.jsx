@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
 // Chevron icon component for expandable menu
@@ -21,6 +21,23 @@ const ChevronIcon = ({ isExpanded }) => (
     }}
   >
     <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+)
+
+// Profile icon for mobile
+const ProfileIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+    <circle cx="12" cy="7" r="4"></circle>
+  </svg>
+)
+
+// Logout icon
+const LogoutIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+    <polyline points="16 17 21 12 16 7"></polyline>
+    <line x1="21" y1="12" x2="9" y2="12"></line>
   </svg>
 )
 
@@ -94,22 +111,43 @@ const DashboardIcon = () => (
   </svg>
 )
 
+// Code icon for API Dashboard
+const CodeIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="16 18 22 12 16 6"></polyline>
+    <polyline points="8 6 2 12 8 18"></polyline>
+  </svg>
+)
+
 export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
-  const { member, isAdmin } = useAuth()
+  const { member, isAdmin, subscription, logout } = useAuth()
   const location = useLocation()
-  console.log('[Sidebar] Member data:', member);
+  const navigate = useNavigate()
   const userName = member?.customFields?.['first-name'] || member?.auth?.email?.split('@')[0] || 'User'
   const [activeLink, setActiveLink] = useState(activePage || 'cryptocurrency')
   const [isResourcesExpanded, setIsResourcesExpanded] = useState(false)
   const [isAdminExpanded, setIsAdminExpanded] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Check if mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 992)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Update active link based on current location
   useEffect(() => {
     const path = location.pathname
-    if (path.startsWith('/predictions')) {
+    if (path.startsWith('/profile')) {
+      setActiveLink('profile')
+    } else if (path.startsWith('/predictions')) {
       setActiveLink('predictions')
     } else if (path.startsWith('/cryptocurrency')) {
       setActiveLink('cryptocurrency')
+    } else if (path.startsWith('/api-dashboard')) {
+      setActiveLink('api-dashboard')
     } else if (path.startsWith('/admin')) {
       setActiveLink('admin')
       // Auto-expand admin menu when on admin pages
@@ -154,7 +192,16 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
     { 
       id: 'predictions', 
       label: 'Predictions', 
-      path: '/predictions'
+      path: '/predictions',
+      planLabel: 'Pro Plan'
+    },
+    // API Dashboard - Shown to all users
+    {
+      id: 'api-dashboard',
+      label: 'API Dashboard',
+      path: '/api-dashboard',
+      icon: CodeIcon,
+      planLabel: 'API Plan'
     },
     { 
       id: 'resources', 
@@ -245,13 +292,23 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
     onNavigate?.(subLink.path, subLink.id)
   }
 
+  const handleLogout = async () => {
+    const result = await logout()
+    if (result.success) {
+      navigate('/')
+    }
+  }
+
   return (
     <>
       <div 
         className="sidebar_app_wrapper"
         style={{
           transform: isOpen ? 'translate(0%)' : 'translate(-100%)',
-          transition: 'transform 0.4s ease'
+          transition: 'transform 0.4s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}
       >
         <div className="sidebar_app_header">
@@ -264,7 +321,7 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
           </div>
         </div>
 
-        <div className="sidebar_app_link_wrapper">
+        <div className="sidebar_app_link_wrapper" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {/* Admin Section - Rendered at TOP if user is admin */}
           {adminLinks.map((link) => (
             <React.Fragment key={link.id}>
@@ -357,14 +414,58 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
                   className={`sidebar_app_link ${activeLink === link.id ? 'is-active' : ''}`}
                   style={activeLink !== link.id ? { color: '#666' } : {}}
                 >
-                  <div className="text-size-medium">{link.label}</div>
+                  <div className="text-size-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {link.label}
+                    {link.planLabel && (
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        padding: '0.15rem 0.4rem',
+                        borderRadius: '0.25rem',
+                        backgroundColor: 'rgba(38, 166, 154, 0.1)',
+                        color: 'var(--color-green, #26a69a)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.02em',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {link.planLabel}
+                      </span>
+                    )}
+                  </div>
                 </button>
               )}
             </React.Fragment>
           ))}
-
-
         </div>
+
+        {/* Mobile-only Profile & Logout Section */}
+        {isMobile && (
+          <div className="sidebar_mobile_footer">
+            <div className="sidebar_mobile_divider"></div>
+            <button
+              onClick={() => {
+                setActiveLink('profile')
+                onNavigate?.('/profile', 'profile')
+              }}
+              className={`sidebar_app_link sidebar_mobile_link ${activeLink === 'profile' ? 'is-active' : ''}`}
+              style={activeLink !== 'profile' ? { color: '#666' } : {}}
+            >
+              <div className="text-size-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <ProfileIcon />
+                Profile Settings
+              </div>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="sidebar_app_link sidebar_mobile_link sidebar_logout_link"
+            >
+              <div className="text-size-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <LogoutIcon />
+                Log Out
+              </div>
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -410,6 +511,55 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
         
         .sidebar_app_sublink svg {
           flex-shrink: 0;
+        }
+
+        /* Mobile footer styles */
+        .sidebar_mobile_footer {
+          padding: 0.5rem 0 1rem;
+          flex-shrink: 0;
+        }
+
+        .sidebar_mobile_divider {
+          height: 1px;
+          background-color: var(--border-color--border-primary, #e5e5e7);
+          margin: 0.5rem 1rem 0.75rem;
+        }
+
+        .sidebar_mobile_link {
+          display: flex !important;
+        }
+
+        .sidebar_mobile_link svg {
+          flex-shrink: 0;
+          width: 18px;
+          height: 18px;
+        }
+
+        .sidebar_logout_link {
+          color: #ef5350 !important;
+        }
+
+        .sidebar_logout_link:hover {
+          background-color: rgba(239, 83, 80, 0.08) !important;
+          color: #ef5350 !important;
+        }
+
+        /* Scrollbar styling for sidebar */
+        .sidebar_app_link_wrapper::-webkit-scrollbar {
+          width: 4px;
+        }
+
+        .sidebar_app_link_wrapper::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .sidebar_app_link_wrapper::-webkit-scrollbar-thumb {
+          background-color: rgba(0, 0, 0, 0.1);
+          border-radius: 4px;
+        }
+
+        .sidebar_app_link_wrapper::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(0, 0, 0, 0.2);
         }
       `}</style>
     </>

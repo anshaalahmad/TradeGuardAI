@@ -116,8 +116,6 @@ const AdminDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
-
   useEffect(() => {
     fetchDashboardStats();
   }, []);
@@ -127,23 +125,11 @@ const AdminDashboardPage = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_URL}/api/admin/stats`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch dashboard stats');
-      }
-
-      const result = await response.json();
+      const { adminApi } = await import('../../services/adminApi');
+      const result = await adminApi.get('/api/admin/stats');
+      
       // Backend returns { success: true, data: stats }
       const statsData = result.data || result;
-      console.log('Dashboard stats:', statsData); // Debug log
       setStats(statsData);
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);

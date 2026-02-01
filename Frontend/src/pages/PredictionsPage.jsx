@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../Components/Dashboard Pages/Navbar';
 import Sidebar from '../Components/Dashboard Pages/Sidebar';
+
+// Prediction API URL
+const PREDICTION_API_URL = 'http://140.245.22.67:5000/api/prediction';
 
 // Coin prediction data
 const predictionCoins = [
@@ -29,21 +32,20 @@ const predictionCoins = [
   },
 ];
 
-// Placeholder prediction data for Bitcoin
-const bitcoinPrediction = {
-  currentPrice: '$104,532.18',
-  aiConfidence: 87,
-  recommendation: 'Open Long Position',
-  recommendationType: 'long', // 'long' | 'short' | 'hold'
-  steps: {
-    orderType: 'Limit Order',
-    buyPrice: '$103,850.00',
-    takeProfit: '$108,200.00',
-    stopLoss: '$101,500.00',
-  },
-  reason: 'High probability dip detected based on RSI divergence and volume analysis. Valid for next 1 hour.',
-  nextScanAt: '14:30:00 UTC',
-  lastUpdated: 'January 20, 2026 at 13:30 UTC',
+// Helper function to determine recommendation type from recommendation text
+const getRecommendationType = (recommendation) => {
+  const lowerRec = recommendation?.toLowerCase() || '';
+  if (lowerRec.includes('buy') || lowerRec.includes('long')) return 'long';
+  if (lowerRec.includes('sell') || lowerRec.includes('short')) return 'short';
+  return 'neutral';
+};
+
+// Helper function to get confidence color based on value
+const getConfidenceColor = (confidence, apiColor) => {
+  if (apiColor) return apiColor;
+  if (confidence >= 70) return 'var(--color-green)';
+  if (confidence >= 50) return '#f0ad4e';
+  return 'var(--color-red)';
 };
 
 export default function PredictionsPage() {
@@ -52,6 +54,41 @@ export default function PredictionsPage() {
   const params = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCoin, setSelectedCoin] = useState(null);
+  const [prediction, setPrediction] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch prediction data from API
+  const fetchPrediction = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(PREDICTION_API_URL);
+      if (!response.ok) {
+        throw new Error('Failed to fetch prediction data');
+      }
+      const data = await response.json();
+      setPrediction({
+        currentPrice: data.current_price,
+        aiConfidence: data.confidence,
+        confidenceColor: data.confidence_color,
+        recommendation: data.recommendation,
+        recommendationColor: data.rec_color,
+        recommendationType: getRecommendationType(data.recommendation),
+        entryPrice: data.entry_price,
+        takeProfit: data.take_profit,
+        stopLoss: data.stop_loss,
+        reason: data.reason,
+        nextScanAt: data.next_scan,
+        lastUpdated: data.last_updated,
+      });
+    } catch (err) {
+      console.error('Error fetching prediction:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Initialize selected coin from URL parameter
   useEffect(() => {
@@ -66,8 +103,24 @@ export default function PredictionsPage() {
       }
     } else {
       setSelectedCoin(null);
+      setPrediction(null);
     }
   }, [params.coinId, navigate]);
+
+  // Fetch prediction when a coin is selected
+  useEffect(() => {
+    if (selectedCoin && selectedCoin.id === 'bitcoin') {
+      fetchPrediction();
+    }
+  }, [selectedCoin, fetchPrediction]);
+
+  // Auto-refresh prediction every 60 seconds when viewing Bitcoin
+  useEffect(() => {
+    if (selectedCoin && selectedCoin.id === 'bitcoin') {
+      const interval = setInterval(fetchPrediction, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedCoin, fetchPrediction]);
 
   const handleMenuToggle = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -108,77 +161,26 @@ export default function PredictionsPage() {
               /* Coin Selection View */
               <>
                 {/* Coin Selection Cards */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: '1.25rem',
-                  }}
-                >
+                <div className="predictions-grid">
                   {predictionCoins.map((coin) => (
                     <div
                       key={coin.id}
                       onClick={() => handleCoinSelect(coin)}
-                      className="card_app_wrapper"
-                      style={{
-                        padding: '1.5rem',
-                        cursor: coin.available ? 'pointer' : 'not-allowed',
-                        opacity: coin.available ? 1 : 0.5,
-                        position: 'relative',
-                        transition: 'all 0.2s ease',
-                        border: coin.available 
-                          ? '1px solid var(--border-color--border-primary)' 
-                          : '1px solid var(--border-color--border-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (coin.available) {
-                          e.currentTarget.style.borderColor = 'var(--base-color-brand--color-primary)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(30, 101, 250, 0.15)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--border-color--border-primary)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
+                      className={`card_app_wrapper prediction-card ${coin.available ? 'prediction-card--active' : 'prediction-card--disabled'}`}
                     >
                       {/* Coming Soon Badge */}
                       {!coin.available && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '0.75rem',
-                            right: '0.75rem',
-                            backgroundColor: 'var(--text-color--text-secondary)',
-                            color: 'white',
-                            fontSize: '0.7rem',
-                            fontWeight: '600',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.25rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                          }}
-                        >
+                        <div className="prediction-badge">
                           Coming Soon
                         </div>
                       )}
 
                       {/* Coin Icon & Name */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '1rem',
-                          marginBottom: '1rem',
-                        }}
-                      >
+                      <div className="prediction-card-header">
                         <img
                           src={coin.icon}
                           alt={coin.name}
-                          style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '50%',
-                          }}
+                          className="prediction-card-icon"
                         />
                         <div>
                           <div className="text-size-large text-weight-semibold">
@@ -191,22 +193,9 @@ export default function PredictionsPage() {
                       </div>
 
                       {/* Status */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                        }}
-                      >
+                      <div className="prediction-card-status">
                         <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: coin.available 
-                              ? 'var(--color-green)' 
-                              : 'var(--text-color--text-secondary)',
-                          }}
+                          className={`prediction-status-dot ${coin.available ? 'prediction-status-dot--active' : ''}`}
                         />
                         <span className="text-size-small text-color-secondary">
                           {coin.available ? 'AI Model Active' : 'Model Training'}
@@ -215,13 +204,7 @@ export default function PredictionsPage() {
 
                       {/* Click to View */}
                       {coin.available && (
-                        <div
-                          style={{
-                            marginTop: '1rem',
-                            paddingTop: '1rem',
-                            borderTop: '1px solid var(--border-color--border-primary)',
-                          }}
-                        >
+                        <div className="prediction-card-footer">
                           <span 
                             className="text-size-small text-weight-medium"
                             style={{ color: 'var(--base-color-brand--color-primary)' }}
@@ -235,27 +218,9 @@ export default function PredictionsPage() {
                 </div>
 
                 {/* Info Card */}
-                <div 
-                  className="card_app_wrapper"
-                  style={{ 
-                    padding: '1.5rem',
-                    backgroundColor: 'var(--background-grey)',
-                    border: 'none',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--base-color-brand--color-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
+                <div className="card_app_wrapper predictions-info-card">
+                  <div className="predictions-info-content">
+                    <div className="predictions-info-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
@@ -289,295 +254,226 @@ export default function PredictionsPage() {
                   </button>
                 </div>
 
-                {/* Main Content Grid */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '1.25rem',
-                  }}
-                >
-                  {/* Left Column - Price & Confidence */}
-                  <div className="card_app_wrapper">
-                    {/* Header */}
-                    <div className="card_app_header">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <img
-                          src={selectedCoin.icon}
-                          alt={selectedCoin.name}
-                          style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-                        />
-                        <div>
-                          <div className="text-size-medium text-weight-semibold">
-                            {selectedCoin.name} Prediction
-                          </div>
-                          <div className="text-size-small text-color-secondary">
-                            {selectedCoin.symbol}/USDT
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Body */}
-                    <div style={{ padding: '1.25rem' }}>
-                      {/* Current Price */}
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.25rem' }}>
-                          Current Price
-                        </div>
-                        <div 
-                          className="text-weight-bold"
-                          style={{ fontSize: '2.25rem', lineHeight: 1 }}
-                        >
-                          {bitcoinPrediction.currentPrice}
-                        </div>
-                      </div>
-
-                      {/* AI Confidence */}
-                      <div>
-                        <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.5rem' }}>
-                          AI Confidence
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                          {/* Progress Bar */}
-                          <div
-                            style={{
-                              flex: 1,
-                              height: '8px',
-                              backgroundColor: '#e5e5e7',
-                              borderRadius: '4px',
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${bitcoinPrediction.aiConfidence}%`,
-                                height: '100%',
-                                backgroundColor: 'var(--color-green)',
-                                borderRadius: '4px',
-                                transition: 'width 0.3s ease',
-                              }}
-                            />
-                          </div>
-                          {/* Percentage */}
-                          <span 
-                            className="text-size-large text-weight-semibold"
-                            style={{ color: 'var(--color-green)' }}
-                          >
-                            {bitcoinPrediction.aiConfidence}%
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Last Updated */}
-                      <div 
-                        style={{ 
-                          marginTop: '1.5rem', 
-                          paddingTop: '1rem', 
-                          borderTop: '1px solid var(--border-color--border-primary)' 
-                        }}
-                      >
-                        <div className="text-size-tiny text-color-secondary">
-                          Last updated: {bitcoinPrediction.lastUpdated}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Recommendation */}
-                  <div className="card_app_wrapper">
-                    {/* Header */}
-                    <div 
-                      className="card_app_header"
-                      style={{
-                        backgroundColor: bitcoinPrediction.recommendationType === 'long' 
-                          ? 'rgba(38, 166, 154, 0.08)' 
-                          : bitcoinPrediction.recommendationType === 'short'
-                          ? 'rgba(239, 83, 80, 0.08)'
-                          : 'transparent',
-                      }}
-                    >
-                      <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.25rem' }}>
-                        Recommendation
-                      </div>
-                      <div 
-                        className="text-size-xlarge text-weight-bold"
-                        style={{ 
-                          color: bitcoinPrediction.recommendationType === 'long' 
-                            ? 'var(--color-green)' 
-                            : bitcoinPrediction.recommendationType === 'short'
-                            ? 'var(--color-red)'
-                            : 'var(--text-color--text-primary)',
-                        }}
-                      >
-                        {bitcoinPrediction.recommendation}
-                      </div>
-                    </div>
-
-                    {/* Body */}
-                    <div style={{ padding: '1.25rem' }}>
-                      {/* Steps */}
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <div 
-                          className="text-size-small text-weight-semibold" 
-                          style={{ 
-                            marginBottom: '1rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            color: 'var(--text-color--text-secondary)',
-                          }}
-                        >
-                          Trading Steps
-                        </div>
-
-                        {/* Step Items */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          {/* Order Type */}
-                          <div 
-                            style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '0.75rem',
-                              backgroundColor: 'var(--background-grey)',
-                              borderRadius: '0.5rem',
-                            }}
-                          >
-                            <span className="text-size-regular text-color-secondary">Select order type:</span>
-                            <span className="text-size-regular text-weight-medium">
-                              {bitcoinPrediction.steps.orderType}
-                            </span>
-                          </div>
-
-                          {/* Buy Price */}
-                          <div 
-                            style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '0.75rem',
-                              backgroundColor: 'var(--background-grey)',
-                              borderRadius: '0.5rem',
-                            }}
-                          >
-                            <span className="text-size-regular text-color-secondary">Set buy price:</span>
-                            <span className="text-size-regular text-weight-medium" style={{ color: 'var(--color-green)' }}>
-                              {bitcoinPrediction.steps.buyPrice}
-                            </span>
-                          </div>
-
-                          {/* Take Profit */}
-                          <div 
-                            style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '0.75rem',
-                              backgroundColor: 'var(--background-grey)',
-                              borderRadius: '0.5rem',
-                            }}
-                          >
-                            <span className="text-size-regular text-color-secondary">Set take profit:</span>
-                            <span className="text-size-regular text-weight-medium" style={{ color: 'var(--color-green)' }}>
-                              {bitcoinPrediction.steps.takeProfit}
-                            </span>
-                          </div>
-
-                          {/* Stop Loss */}
-                          <div 
-                            style={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '0.75rem',
-                              backgroundColor: 'var(--background-grey)',
-                              borderRadius: '0.5rem',
-                            }}
-                          >
-                            <span className="text-size-regular text-color-secondary">Set stop loss:</span>
-                            <span className="text-size-regular text-weight-medium" style={{ color: 'var(--color-red)' }}>
-                              {bitcoinPrediction.steps.stopLoss}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Reason */}
-                      <div 
-                        style={{ 
-                          padding: '1rem',
-                          backgroundColor: 'rgba(30, 101, 250, 0.05)',
-                          borderRadius: '0.5rem',
-                          borderLeft: '3px solid var(--base-color-brand--color-primary)',
-                        }}
-                      >
-                        <div 
-                          className="text-size-small text-weight-semibold" 
-                          style={{ marginBottom: '0.5rem' }}
-                        >
-                          Reason
-                        </div>
-                        <p className="text-size-regular text-color-secondary" style={{ lineHeight: 1.5 }}>
-                          {bitcoinPrediction.reason}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Next Scan Card */}
-                <div 
-                  className="card_app_wrapper"
-                  style={{ 
-                    padding: '1.25rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        backgroundColor: 'rgba(30, 101, 250, 0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                {/* Loading State */}
+                {isLoading && !prediction && (
+                  <div className="card_app_wrapper" style={{ padding: '3rem', textAlign: 'center' }}>
+                    <div className="prediction-loading-spinner" style={{ marginBottom: '1rem' }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="spinning">
+                        <path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
-                    <div>
-                      <div className="text-size-small text-color-secondary">
-                        Next AI Scan
+                    <div className="text-size-medium text-color-secondary">Loading prediction data...</div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {error && (
+                  <div className="card_app_wrapper" style={{ padding: '2rem', textAlign: 'center', borderColor: 'var(--color-red)' }}>
+                    <div className="text-size-medium" style={{ color: 'var(--color-red)', marginBottom: '1rem' }}>
+                      ⚠️ {error}
+                    </div>
+                    <button onClick={fetchPrediction} className="button is-secondary is-small">
+                      Try Again
+                    </button>
+                  </div>
+                )}
+
+                {/* Main Content Grid */}
+                {prediction && (
+                  <div className="prediction-detail-grid">
+                    {/* Left Column - Price & Confidence */}
+                    <div className="card_app_wrapper">
+                      {/* Header */}
+                      <div className="card_app_header prediction-detail-header">
+                        <div className="prediction-coin-info">
+                          <img
+                            src={selectedCoin.icon}
+                            alt={selectedCoin.name}
+                            className="prediction-coin-icon-sm"
+                          />
+                          <div>
+                            <div className="text-size-medium text-weight-semibold">
+                              {selectedCoin.name} Prediction
+                            </div>
+                            <div className="text-size-small text-color-secondary">
+                              {selectedCoin.symbol}/USDT
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-size-medium text-weight-semibold">
-                        {bitcoinPrediction.nextScanAt}
+
+                      {/* Body */}
+                      <div className="prediction-detail-body">
+                        {/* Current Price */}
+                        <div className="prediction-price-section">
+                          <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.25rem' }}>
+                            Current Price
+                          </div>
+                          <div className="prediction-price-value text-weight-bold">
+                            {prediction.currentPrice}
+                          </div>
+                        </div>
+
+                        {/* AI Confidence */}
+                        <div>
+                          <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.5rem' }}>
+                            AI Confidence
+                          </div>
+                          <div className="prediction-confidence-row">
+                            {/* Progress Bar */}
+                            <div className="prediction-progress-bar">
+                              <div
+                                className="prediction-progress-fill"
+                                style={{ 
+                                  width: `${prediction.aiConfidence}%`,
+                                  backgroundColor: getConfidenceColor(prediction.aiConfidence, prediction.confidenceColor)
+                                }}
+                              />
+                            </div>
+                            {/* Percentage */}
+                            <span 
+                              className="text-size-large text-weight-semibold"
+                              style={{ color: getConfidenceColor(prediction.aiConfidence, prediction.confidenceColor) }}
+                            >
+                              {prediction.aiConfidence}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Last Updated */}
+                        <div className="prediction-last-updated">
+                          <div className="text-size-tiny text-color-secondary">
+                            Last updated: {prediction.lastUpdated}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column - Recommendation */}
+                    <div className="card_app_wrapper">
+                      {/* Header */}
+                      <div 
+                        className="card_app_header prediction-recommendation-header"
+                        style={{
+                          backgroundColor: prediction.recommendationType === 'long' 
+                            ? 'rgba(38, 166, 154, 0.08)' 
+                            : prediction.recommendationType === 'short'
+                            ? 'rgba(239, 83, 80, 0.08)'
+                            : 'rgba(139, 148, 158, 0.08)',
+                        }}
+                      >
+                        <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.25rem' }}>
+                          Recommendation
+                        </div>
+                        <div 
+                          className="text-size-xlarge text-weight-bold"
+                          style={{ 
+                            color: prediction.recommendationColor || (
+                              prediction.recommendationType === 'long' 
+                                ? 'var(--color-green)' 
+                                : prediction.recommendationType === 'short'
+                                ? 'var(--color-red)'
+                                : 'var(--text-color--text-primary)'
+                            ),
+                          }}
+                        >
+                          {prediction.recommendation}
+                        </div>
+                      </div>
+
+                      {/* Body */}
+                      <div className="prediction-detail-body">
+                        {/* Trading Parameters */}
+                        <div className="prediction-steps-section">
+                          <div className="prediction-steps-title text-size-small text-weight-semibold">
+                            Trading Parameters
+                          </div>
+
+                          {/* Parameter Items */}
+                          <div className="prediction-steps-list">
+                            {/* Entry Price */}
+                            <div className="prediction-step-item">
+                              <span className="text-size-regular text-color-secondary">Entry Price:</span>
+                              <span 
+                                className="text-size-regular text-weight-medium"
+                                style={{ color: prediction.entryPrice !== '-' ? 'var(--color-green)' : 'var(--text-color--text-secondary)' }}
+                              >
+                                {prediction.entryPrice}
+                              </span>
+                            </div>
+
+                            {/* Take Profit */}
+                            <div className="prediction-step-item">
+                              <span className="text-size-regular text-color-secondary">Take Profit:</span>
+                              <span 
+                                className="text-size-regular text-weight-medium"
+                                style={{ color: prediction.takeProfit !== '-' ? 'var(--color-green)' : 'var(--text-color--text-secondary)' }}
+                              >
+                                {prediction.takeProfit}
+                              </span>
+                            </div>
+
+                            {/* Stop Loss */}
+                            <div className="prediction-step-item">
+                              <span className="text-size-regular text-color-secondary">Stop Loss:</span>
+                              <span 
+                                className="text-size-regular text-weight-medium"
+                                style={{ color: prediction.stopLoss !== '-' ? 'var(--color-red)' : 'var(--text-color--text-secondary)' }}
+                              >
+                                {prediction.stopLoss}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Reason */}
+                        <div className="prediction-reason">
+                          <div className="text-size-small text-weight-semibold" style={{ marginBottom: '0.5rem' }}>
+                            Analysis
+                          </div>
+                          <p className="text-size-regular text-color-secondary" style={{ lineHeight: 1.5 }}>
+                            {prediction.reason}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
+                )}
 
-                  <button className="button is-secondary is-small">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '0.5rem' }}>
-                      <path d="M1 4V10H7M23 20V14H17M20.49 9C19.9828 7.56678 19.1209 6.28535 17.9845 5.27557C16.8482 4.26579 15.4745 3.56141 13.9917 3.22617C12.509 2.89093 10.9652 2.93574 9.50481 3.35651C8.04437 3.77728 6.71475 4.56074 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4393 15.9556 20.2227 14.4952 20.6435C13.0348 21.0643 11.491 21.1091 10.0083 20.7738C8.52547 20.4386 7.1518 19.7342 6.01547 18.7244C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Refresh Prediction
-                  </button>
-                </div>
+                {/* Next Scan Card */}
+                {prediction && (
+                  <div className="card_app_wrapper prediction-scan-card">
+                    <div className="prediction-scan-info">
+                      <div className="prediction-scan-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-size-small text-color-secondary">
+                          Next AI Scan
+                        </div>
+                        <div className="text-size-medium text-weight-semibold">
+                          {prediction.nextScanAt}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={fetchPrediction} 
+                      disabled={isLoading}
+                      className="button is-secondary is-small prediction-refresh-btn"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={isLoading ? 'spinning' : ''}>
+                        <path d="M1 4V10H7M23 20V14H17M20.49 9C19.9828 7.56678 19.1209 6.28535 17.9845 5.27557C16.8482 4.26579 15.4745 3.56141 13.9917 3.22617C12.509 2.89093 10.9652 2.93574 9.50481 3.35651C8.04437 3.77728 6.71475 4.56074 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4393 15.9556 20.2227 14.4952 20.6435C13.0348 21.0643 11.491 21.1091 10.0083 20.7738C8.52547 20.4386 7.1518 19.7342 6.01547 18.7244C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {isLoading ? 'Refreshing...' : 'Refresh Prediction'}
+                    </button>
+                  </div>
+                )}
 
                 {/* Disclaimer */}
-                <div 
-                  style={{ 
-                    padding: '1rem',
-                    backgroundColor: 'rgba(239, 83, 80, 0.05)',
-                    borderRadius: '0.5rem',
-                    border: '1px solid rgba(239, 83, 80, 0.2)',
-                  }}
-                >
+                <div className="prediction-disclaimer">
                   <p className="text-size-small text-color-secondary" style={{ lineHeight: 1.5 }}>
                     <strong>⚠️ Disclaimer:</strong> AI predictions are for informational purposes only and 
                     do not constitute financial advice. Always conduct your own research and consider your 

@@ -23,10 +23,11 @@ const MarketOverviewCards = () => {
       setError(null);
       
       // Fetch Bitcoin, Ethereum, and Solana data from backend
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const cryptoPromises = [
-        fetch(`http://localhost:4001/api/crypto/bitcoin`).then(res => res.ok ? res.json() : null).catch(() => null),
-        fetch(`http://localhost:4001/api/crypto/ethereum`).then(res => res.ok ? res.json() : null).catch(() => null),
-        fetch(`http://localhost:4001/api/crypto/solana`).then(res => res.ok ? res.json() : null).catch(() => null)
+        fetch(`${API_BASE}/api/crypto/bitcoin`).then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch(`${API_BASE}/api/crypto/ethereum`).then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch(`${API_BASE}/api/crypto/solana`).then(res => res.ok ? res.json() : null).catch(() => null)
       ];
       
       const [btcData, ethData, solData] = await Promise.all(cryptoPromises);
@@ -50,9 +51,9 @@ const MarketOverviewCards = () => {
       
       // Get sparkline data from Binance (last 24h hourly) - using symbols
       const sparklinePromises = [
-        fetch('http://localhost:4001/api/crypto/BTC/history?interval=1h&limit=24').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('http://localhost:4001/api/crypto/ETH/history?interval=1h&limit=24').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('http://localhost:4001/api/crypto/SOL/history?interval=1h&limit=24').then(r => r.ok ? r.json() : null).catch(() => null)
+        fetch(`${API_BASE}/api/crypto/BTC/history?interval=1h&limit=24`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/api/crypto/ETH/history?interval=1h&limit=24`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/api/crypto/SOL/history?interval=1h&limit=24`).then(r => r.ok ? r.json() : null).catch(() => null)
       ];
       
       const [btcSparkline, ethSparkline, solSparkline] = await Promise.all(sparklinePromises);

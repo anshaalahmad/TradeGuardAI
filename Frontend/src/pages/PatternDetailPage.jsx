@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { apiRequest, getAccessToken } from '../services/api'
 import Sidebar from '../Components/Dashboard Pages/Sidebar'
 import Navbar from '../Components/Dashboard Pages/Navbar'
 
@@ -170,8 +171,11 @@ const ErrorState = ({ message, onBack }) => (
     </svg>
     <h2>Pattern Not Found</h2>
     <p>{message}</p>
-    <button className="button" onClick={onBack}>
-      ← Back to Chart Patterns
+    <button className="button" onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Back to Chart Patterns
     </button>
   </div>
 )
@@ -200,7 +204,7 @@ export default function PatternDetailPage() {
   const [showImageModal, setShowImageModal] = useState(false)
   const [modalImage, setModalImage] = useState({ src: '', alt: '' })
   
-  const memberstackId = member?.id
+  const userId = member?.id
 
   // Fetch pattern
   const fetchPattern = useCallback(async () => {
@@ -235,23 +239,19 @@ export default function PatternDetailPage() {
     }
   }, [slug])
 
-  // Check bookmark status
+  // Check bookmark status (requires authentication)
   const checkBookmarkStatus = useCallback(async () => {
-    if (!memberstackId || !pattern?.id) return
+    if (!userId || !pattern?.id || !getAccessToken()) return
     
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/resources/bookmarks/${memberstackId}/check?resourceType=PATTERN&resourceId=${pattern.id}`
+      const data = await apiRequest(
+        `/api/resources/bookmarks/check?resourceType=PATTERN&resourceId=${pattern.id}`
       )
-      
-      if (response.ok) {
-        const data = await response.json()
-        setIsBookmarked(data.data?.isBookmarked || false)
-      }
+      setIsBookmarked(data.data?.isBookmarked || false)
     } catch (err) {
       console.error('Error checking bookmark status:', err)
     }
-  }, [memberstackId, pattern?.id])
+  }, [userId, pattern?.id])
 
   // Initial load
   useEffect(() => {
@@ -265,9 +265,9 @@ export default function PatternDetailPage() {
     }
   }, [pattern?.id, checkBookmarkStatus])
 
-  // Handle bookmark toggle
+  // Handle bookmark toggle (requires authentication)
   const handleBookmarkToggle = async () => {
-    if (!memberstackId) {
+    if (!userId || !getAccessToken()) {
       navigate('/login')
       return
     }
@@ -277,19 +277,15 @@ export default function PatternDetailPage() {
     setBookmarkLoading(true)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/resources/bookmarks`, {
+      await apiRequest('/api/resources/bookmarks', {
         method: isBookmarked ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberstackId,
           resourceType: 'PATTERN',
           resourceId: pattern.id
         })
       })
       
-      if (response.ok) {
-        setIsBookmarked(!isBookmarked)
-      }
+      setIsBookmarked(!isBookmarked)
     } catch (err) {
       console.error('Error toggling bookmark:', err)
     } finally {
@@ -516,9 +512,12 @@ export default function PatternDetailPage() {
                   <button 
                     className="button is-secondary"
                     onClick={() => navigate('/resources/patterns')}
-                    style={{ width: '100%', marginTop: '1rem' }}
+                    style={{ width: '100%', marginTop: '1rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
-                    ← Back to Chart Patterns
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back to Chart Patterns
                   </button>
                 </aside>
               </div>

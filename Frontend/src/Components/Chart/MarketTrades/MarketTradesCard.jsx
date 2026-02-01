@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { isBinanceSymbolSupported } from '../../../utils/binanceSymbols';
+import { formatPrice as sharedFormatPrice } from '../../../utils/formatters';
 
 const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 13 }) => {
   const [trades, setTrades] = useState([]);
@@ -23,13 +24,12 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
       // Fetch initial trades from backend proxy
       const fetchInitialTrades = async (retryCount = 0) => {
         try {
-          const response = await fetch(`http://localhost:4001/api/crypto/trades?symbol=${symbol}&limit=${maxTrades}`);
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/trades?symbol=${symbol}&limit=${maxTrades}`);
           
           if (!response.ok) {
             // Handle rate limiting with retry
             if (response.status === 429 && retryCount < 3) {
               const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
-              console.warn(`[MarketTrades] Rate limited, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
               await new Promise(resolve => setTimeout(resolve, delay));
               return fetchInitialTrades(retryCount + 1);
             }
@@ -45,9 +45,7 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
           }));
           setTrades(formattedTrades);
         } catch (error) {
-          console.error('Error fetching initial trades:', error);
           // Don't fail completely - WebSocket will provide data once connected
-          console.warn('[MarketTrades] Proceeding with WebSocket despite initial fetch failure');
         }
       };
       fetchInitialTrades();
@@ -68,7 +66,6 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
       wsRef.current = ws;
       let isSubscribed = true;
       ws.onopen = () => {
-        console.log('Market Trades WebSocket connected');
         setIsConnected(true);
       };
       ws.onmessage = (event) => {
@@ -85,7 +82,7 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
           // Limit buffer size to prevent memory leak (max 2x maxTrades)
           pendingTradesRef.current = [newTrade, ...pendingTradesRef.current].slice(0, maxTrades * 2);
         } catch (error) {
-          console.error('Error processing trade:', error);
+          // Trade processing error - silently ignore
         }
       };
       // Throttled update loop - applies trades at controlled intervals
@@ -102,11 +99,9 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
         });
       }, 100); // Check every 100ms but only apply if throttle time has passed
       ws.onerror = (error) => {
-        console.error('Market Trades WebSocket error:', error);
         setIsConnected(false);
       };
       ws.onclose = () => {
-        console.log('Market Trades WebSocket disconnected');
         setIsConnected(false);
       };
       return () => {
@@ -168,7 +163,7 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
   return (
     <div className="card_app_wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="card_app_header" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color--border-primary)' }}>
+      <div className="card_app_header is-compact">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div className="text-size-medium text-weight-medium">Market Trades</div>
           <div style={{
@@ -297,4 +292,4 @@ const MarketTradesCard = ({ symbol = 'ETHUSDT', baseAsset = 'ETH', maxTrades = 1
   );
 };
 
-export default MarketTradesCard;
+export default memo(MarketTradesCard);

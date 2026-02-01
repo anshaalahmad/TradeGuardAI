@@ -1,6 +1,5 @@
 // Prisma Schema for TradeGuardAI
-// This schema is prepared for future features
-// Currently using Memberstack for user management
+// Custom authentication with Passport.js + Google OAuth 2.0
 
 generator client {
   provider = "prisma-client-js"
@@ -12,14 +11,126 @@ datasource db {
 }
 
 // ============================================
-// FUTURE: Portfolio Management
+// USER AUTHENTICATION
+// ============================================
+
+/// User account - supports email/password and Google OAuth
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  email         String    @unique
+  passwordHash  String?   // null for Google OAuth users
+  firstName     String?
+  lastName      String?
+  googleId      String?   // Removed @unique - will use sparse index via MongoDB directly
+  role          UserRole  @default(USER)
+  emailVerified Boolean   @default(false)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  portfolioHoldings PortfolioHolding[]
+  transactions      Transaction[]
+  preferences       UserPreferences?
+  watchlists        Watchlist[]
+  bookmarks         UserBookmark[]
+  readingProgress   ReadingProgress[]
+  priceAlerts       PriceAlert[]
+  refreshTokens     RefreshToken[]
+  subscription      Subscription?
+
+  // Sparse unique index on googleId (allows multiple nulls)
+  @@index([googleId])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// ============================================
+// SUBSCRIPTION & BILLING
+// ============================================
+
+/// User subscription for tier-based access control
+model Subscription {
+  id                   String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String             @unique @db.ObjectId
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planTier             PlanTier           @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  // Index for faster lookups by Stripe IDs (without unique constraint)
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  API_PLAN
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+  INCOMPLETE
+}
+
+/// Stores refresh tokens for JWT authentication
+model RefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Verification codes for email verification and password reset
+model VerificationCode {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  code      String
+  type      CodeType @default(REGISTRATION)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
+  @@index([expiresAt])
+}
+
+enum CodeType {
+  REGISTRATION
+  PASSWORD_RESET
+  SET_PASSWORD
+  LINK_GOOGLE
+}
+
+// ============================================
+// PORTFOLIO MANAGEMENT
 // ============================================
 
 /// User's cryptocurrency holdings
-/// Note: User auth is handled by Memberstack, we store their memberstackId
 model PortfolioHolding {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId   String   // Reference to Memberstack user
+  userId          String   @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   cryptoSymbol    String   // e.g., "BTC", "ETH"
   amount          Float
   averageBuyPrice Float?
@@ -27,14 +138,15 @@ model PortfolioHolding {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([memberstackId, cryptoSymbol])
-  @@index([memberstackId])
+  @@unique([userId, cryptoSymbol])
+  @@index([userId])
 }
 
 /// Transaction history for portfolio
 model Transaction {
   id              String          @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId   String          // Reference to Memberstack user
+  userId          String          @db.ObjectId
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   cryptoSymbol    String
   type            TransactionType
   amount          Float
@@ -45,7 +157,7 @@ model Transaction {
   transactionDate DateTime        @default(now())
   createdAt       DateTime        @default(now())
 
-  @@index([memberstackId])
+  @@index([userId])
   @@index([cryptoSymbol])
 }
 
@@ -57,13 +169,14 @@ enum TransactionType {
 }
 
 // ============================================
-// FUTURE: User Preferences & Watchlist
+// USER PREFERENCES & WATCHLIST
 // ============================================
 
-/// User preferences (supplements Memberstack data)
+/// User preferences
 model UserPreferences {
   id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId        String   @unique
+  userId               String   @unique @db.ObjectId
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   theme                String   @default("light")
   currency             String   @default("USD")
   timezone             String?
@@ -75,17 +188,18 @@ model UserPreferences {
 
 /// User's watchlist of cryptocurrencies
 model Watchlist {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId String
-  cryptoSymbol  String
-  addedAt       DateTime @default(now())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cryptoSymbol String
+  addedAt      DateTime @default(now())
 
-  @@unique([memberstackId, cryptoSymbol])
-  @@index([memberstackId])
+  @@unique([userId, cryptoSymbol])
+  @@index([userId])
 }
 
 // ============================================
-// FUTURE: AI Predictions
+// AI PREDICTIONS
 // ============================================
 
 /// AI-generated price predictions
@@ -184,14 +298,15 @@ model ChartPattern {
 
 /// User bookmarks for articles and patterns
 model UserBookmark {
-  id            String       @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId String       // Reference to Memberstack user
-  resourceType  ResourceType // article or pattern
-  resourceId    String       @db.ObjectId // ID of the bookmarked resource
-  addedAt       DateTime     @default(now())
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String       @db.ObjectId
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceType ResourceType // article or pattern
+  resourceId   String       @db.ObjectId // ID of the bookmarked resource
+  addedAt      DateTime     @default(now())
 
-  @@unique([memberstackId, resourceType, resourceId])
-  @@index([memberstackId])
+  @@unique([userId, resourceType, resourceId])
+  @@index([userId])
   @@index([resourceType])
 }
 
@@ -202,15 +317,16 @@ enum ResourceType {
 
 /// User reading progress (optional - tracks which articles have been read)
 model ReadingProgress {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId String
-  articleId     String   @db.ObjectId
-  completed     Boolean  @default(false)
-  progress      Int      @default(0) // Percentage 0-100
-  lastReadAt    DateTime @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleId String   @db.ObjectId
+  completed Boolean  @default(false)
+  progress  Int      @default(0) // Percentage 0-100
+  lastReadAt DateTime @default(now())
 
-  @@unique([memberstackId, articleId])
-  @@index([memberstackId])
+  @@unique([userId, articleId])
+  @@index([userId])
 }
 
 // ============================================
@@ -242,16 +358,17 @@ model CryptoCache {
 
 /// User-defined price alerts
 model PriceAlert {
-  id            String         @id @default(auto()) @map("_id") @db.ObjectId
-  memberstackId String
-  cryptoSymbol  String
-  targetPrice   Float
-  condition     AlertCondition
-  isActive      Boolean        @default(true)
-  triggeredAt   DateTime?
-  createdAt     DateTime       @default(now())
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String         @db.ObjectId
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cryptoSymbol String
+  targetPrice  Float
+  condition    AlertCondition
+  isActive     Boolean        @default(true)
+  triggeredAt  DateTime?
+  createdAt    DateTime       @default(now())
 
-  @@index([memberstackId])
+  @@index([userId])
   @@index([cryptoSymbol, isActive])
 }
 
@@ -268,7 +385,7 @@ enum AlertCondition {
 model AdminAuditLog {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   adminEmail  String   // Email of admin who performed action
-  adminId     String   // Memberstack ID of admin
+  adminId     String   @db.ObjectId // User ID of admin
   action      String   // CREATE, UPDATE, DELETE
   targetType  String   // USER, ARTICLE, PATTERN
   targetId    String   // ID of affected resource

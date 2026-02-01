@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import MarketChange from './MarketChange';
 import coinOverrides from './coinOverrides';
 
@@ -95,7 +95,6 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
             const parsed = JSON.parse(cachedData);
             const age = Date.now() - parsed.timestamp;
             if (age < 180000) { // 3 minutes = 180000ms
-              console.log('[MarketSummary] Using cached data from localStorage');
               setMarketData(parsed.data);
               setDebugInfo({ ...parsed.debugInfo, cached: true, age: Math.round(age/1000) + 's' });
               setError(null);
@@ -103,7 +102,6 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
               return;
             }
           } catch (e) {
-            console.warn('[MarketSummary] Cache parse error:', e);
             localStorage.removeItem(cacheKey);
           }
         }
@@ -125,13 +123,12 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
         }
         
         setDebugInfo(prev => ({ ...prev, resolvedCgId, stage: 'fetching' }));
-        console.log('[MarketSummary] Fetching:', { symbol, baseSymbol, coinId, resolvedCgId });
         
         if (!resolvedCgId) {
           throw new Error('Could not resolve CoinGecko ID from props');
         }
         
-        const apiUrl = `http://localhost:4001/api/crypto/${resolvedCgId}`;
+        const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/${resolvedCgId}`;
         setDebugInfo(prev => ({ ...prev, apiUrl }));
         
         const cgRes = await fetch(apiUrl);
@@ -153,11 +150,8 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
         
         // Check if data has required fields
         if (data.marketCap === undefined && data.currentPrice === undefined) {
-          console.warn('[MarketSummary] API returned incomplete data:', data);
           setDebugInfo(prev => ({ ...prev, warning: 'Incomplete data from API', rawData: data }));
         }
-        
-        console.log('[MarketSummary] Success for', resolvedCgId, '- MarketCap:', data.marketCap, 'Price:', data.currentPrice);
         
         if (!cancelled) {
           const marketDataObj = {
@@ -199,7 +193,7 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
               debugInfo: { symbol, coinId, resolvedCgId }
             }));
           } catch (e) {
-            console.warn('[MarketSummary] Failed to cache:', e);
+            // Cache write failed - non-critical
           }
           
           setDebugInfo(prev => ({ ...prev, stage: 'success', dataReceived: true }));
@@ -208,7 +202,6 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
           setRetryDelay(1000); // Reset retry delay on success
         }
       } catch (err) {
-        console.error('[MarketSummary] ERROR:', err.message);
         if (!cancelled) {
           let friendlyError = err.message;
           
@@ -222,7 +215,6 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
             if (cachedData) {
               try {
                 const parsed = JSON.parse(cachedData);
-                console.log('[MarketSummary] Using stale cache due to rate limit');
                 setMarketData(parsed.data);
                 setDebugInfo({ ...parsed.debugInfo, stale: true, errorFallback: true });
                 setError('Using cached data (may be outdated)');
@@ -230,12 +222,11 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
                 
                 // Auto-retry after 60 seconds
                 setTimeout(() => {
-                  console.log('[MarketSummary] Auto-retrying after rate limit...');
                   setRetryCount(prev => prev + 1);
                 }, 60000);
                 return;
               } catch (e) {
-                console.warn('[MarketSummary] Stale cache unusable:', e);
+                // Stale cache unusable
               }
             }
           }
@@ -251,7 +242,6 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
     
     // Set up periodic refresh every 2 minutes while on the same coin
     const refreshInterval = setInterval(() => {
-      console.log('[MarketSummary] Auto-refreshing data...');
       fetchMarketData();
     }, 120000); // 2 minutes
     
@@ -333,7 +323,6 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
     // Exponential backoff: increase delay for subsequent retries
     const newDelay = Math.min(retryDelay * 2, 30000); // Max 30 seconds
     setRetryDelay(newDelay);
-    console.log(`[MarketSummary] Retrying in ${newDelay}ms...`);
     
     setTimeout(() => {
       setRetryCount(prev => prev + 1); // This triggers the useEffect to run again
@@ -694,7 +683,7 @@ const MarketSummary = ({ symbol = 'BTCUSDT', coinId = 'bitcoin', name = 'Bitcoin
   );
 };
 
-export default MarketSummary;
+export default memo(MarketSummary);
 
 // Helper function for time ago
 function getTimeAgo(dateString) {

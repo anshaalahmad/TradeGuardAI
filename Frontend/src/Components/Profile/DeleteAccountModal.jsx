@@ -5,43 +5,32 @@ import ModalWrapper from '../Memberstack/ModalWrapper';
 
 const DeleteAccountModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { deleteMemberAccount, member } = useAuth();
-  const [confirmText, setConfirmText] = useState('');
+  const { deleteAccount, user } = useAuth();
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Get user's full name and replace spaces with dashes
-  const userFullName = member?.customFields?.['first-name'] || 'User';
-  const requiredText = userFullName.replace(/\s+/g, '-');
-  
-  console.log('[DeleteAccount] User full name:', userFullName);
-  console.log('[DeleteAccount] Required confirmation text:', requiredText);
+  // Check if user needs password (has passwordHash, not Google-only)
+  const requiresPassword = user?.passwordHash || !user?.googleId;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (confirmText !== requiredText) {
-      setError(`Please type "${requiredText}" to confirm.`);
+    if (requiresPassword && !password) {
+      setError('Password is required to delete your account.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      console.log('Attempting to delete account...');
-      const result = await deleteMemberAccount();
-      console.log('Delete account result:', result);
+      const result = await deleteAccount(requiresPassword ? password : undefined);
       
       if (result.success) {
         navigate('/');
       } else {
-        // Check if it's a Memberstack restriction error
-        if (result.error?.includes('contact') || result.error?.includes('owner') || result.error?.includes('disabled')) {
-          setError('Account deletion is currently disabled. This feature can be enabled in your Memberstack dashboard under Settings > General > Member Self-Service.');
-        } else {
-          setError(result.error || 'Failed to delete account.');
-        }
+        setError(result.error || 'Failed to delete account.');
       }
     } catch (err) {
       console.error('Delete account error:', err);
@@ -52,7 +41,7 @@ const DeleteAccountModal = ({ isOpen, onClose }) => {
   };
 
   const handleClose = () => {
-    setConfirmText('');
+    setPassword('');
     setError('');
     onClose();
   };
@@ -99,30 +88,26 @@ const DeleteAccountModal = ({ isOpen, onClose }) => {
           )}
 
           <div className="main_form_fields_wrapper">
-            <div className="main_form_fields">
-              <label htmlFor="confirmText" className="main_form_label">
-                Type <strong style={{ color: '#ef5350' }}>"{requiredText}"</strong> to confirm
-              </label>
-              <input
-                className="main_form_input w-input"
-                name="confirmText"
-                placeholder={`Type ${requiredText} here`}
-                type="text"
-                id="confirmText"
-                value={confirmText}
-                onChange={(e) => {
-                  setConfirmText(e.target.value);
-                  if (error) setError('');
-                }}
-                required
-                style={{
-                  borderColor: confirmText && confirmText !== requiredText ? '#ef5350' : undefined
-                }}
-              />
-              <p className="text-size-tiny text-color-secondary" style={{ marginTop: '0.5rem' }}>
-                Use dashes instead of spaces
-              </p>
-            </div>
+            {requiresPassword && (
+              <div className="main_form_fields">
+                <label htmlFor="deletePassword" className="main_form_label">
+                  Enter your password to confirm
+                </label>
+                <input
+                  className="main_form_input w-input"
+                  name="deletePassword"
+                  placeholder="Enter your password"
+                  type="password"
+                  id="deletePassword"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError('');
+                  }}
+                  required
+                />
+              </div>
+            )}
           </div>
 
           <div className="main_form_footer" style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
@@ -140,9 +125,9 @@ const DeleteAccountModal = ({ isOpen, onClose }) => {
               style={{ 
                 flex: 1, 
                 backgroundColor: '#ef5350',
-                opacity: confirmText !== requiredText ? 0.5 : 1
+                opacity: (requiresPassword && !password) ? 0.5 : 1
               }}
-              disabled={isLoading || confirmText !== requiredText}
+              disabled={isLoading || (requiresPassword && !password)}
             >
               {isLoading ? 'Deleting...' : 'Delete Account'}
             </button>

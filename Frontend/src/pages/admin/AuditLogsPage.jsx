@@ -108,13 +108,158 @@ const getTargetIcon = (targetType) => {
   }
 };
 
+// Format field name for display
+const formatFieldName = (field) => {
+  const fieldLabels = {
+    // User fields
+    firstName: 'First Name',
+    lastName: 'Last Name',
+    email: 'Email',
+    role: 'Role',
+    emailVerified: 'Email Verified',
+    planTier: 'Plan Tier',
+    status: 'Status',
+    stripeSubscriptionId: 'Stripe Subscription',
+    currentPeriodEnd: 'Subscription Expires',
+    cancelAtPeriodEnd: 'Cancel at Period End',
+    // Article fields
+    title: 'Title',
+    slug: 'Slug',
+    excerpt: 'Excerpt',
+    content: 'Content',
+    category: 'Category',
+    tags: 'Tags',
+    readTime: 'Read Time',
+    difficulty: 'Difficulty',
+    published: 'Published',
+    featured: 'Featured',
+    thumbnailUrl: 'Thumbnail URL',
+    authorName: 'Author',
+    // Pattern fields
+    name: 'Name',
+    description: 'Description',
+    patternType: 'Pattern Type',
+    keyPoints: 'Key Points',
+    howToTrade: 'How to Trade',
+    reliability: 'Reliability',
+    imageUrl: 'Image URL',
+    // Common fields
+    createdAt: 'Created At',
+    updatedAt: 'Updated At',
+    lastLogin: 'Last Login',
+    googleId: 'Google Linked',
+    id: 'ID',
+    subscription: 'Subscription'
+  };
+  return fieldLabels[field] || field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+};
+
+// Format value for display
+const formatValue = (value, field) => {
+  if (value === null || value === undefined) return <span className="admin-value-null">Not set</span>;
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (value instanceof Date || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleString('en-US', { 
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
+    } catch (e) {}
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="admin-value-null">Empty</span>;
+    return value.join(', ');
+  }
+  if (typeof value === 'object') {
+    // Handle subscription object
+    if (field === 'subscription' && value.planTier) {
+      return `${value.planTier} (${value.status || 'ACTIVE'})`;
+    }
+    return JSON.stringify(value, null, 2);
+  }
+  if (typeof value === 'string' && value.length > 100) {
+    return value.substring(0, 100) + '...';
+  }
+  return String(value);
+};
+
+// Fields to ignore in diff display
+const ignoredFields = ['id', 'createdAt', 'updatedAt', 'password', 'passwordHash', 'googleId', 'stripeCustomerId', 'stripeSubscriptionId', 'stripePriceId'];
+
+// User-friendly fields to show for different target types
+const priorityFieldsByType = {
+  USER: ['email', 'firstName', 'lastName', 'role', 'emailVerified', 'subscription'],
+  ARTICLE: ['title', 'slug', 'category', 'published', 'featured', 'difficulty'],
+  PATTERN: ['name', 'slug', 'patternType', 'published', 'difficulty', 'reliability']
+};
+
+// Get changed fields between before and after
+const getChangedFields = (before, after, targetType) => {
+  if (!before || !after) return [];
+  
+  const changes = [];
+  const priorityFields = priorityFieldsByType[targetType] || [];
+  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  
+  // Process priority fields first, then others
+  const sortedKeys = [...allKeys].sort((a, b) => {
+    const aIndex = priorityFields.indexOf(a);
+    const bIndex = priorityFields.indexOf(b);
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    return 0;
+  });
+  
+  for (const key of sortedKeys) {
+    if (ignoredFields.includes(key)) continue;
+    
+    const beforeVal = before[key];
+    const afterVal = after[key];
+    
+    // Handle subscription object specially for users
+    if (key === 'subscription') {
+      const beforePlan = beforeVal?.planTier;
+      const afterPlan = afterVal?.planTier;
+      const beforeStatus = beforeVal?.status;
+      const afterStatus = afterVal?.status;
+      
+      if (beforePlan !== afterPlan || beforeStatus !== afterStatus) {
+        changes.push({
+          field: key,
+          before: beforeVal,
+          after: afterVal
+        });
+      }
+      continue;
+    }
+    
+    // Compare values
+    const beforeStr = JSON.stringify(beforeVal);
+    const afterStr = JSON.stringify(afterVal);
+    
+    if (beforeStr !== afterStr) {
+      changes.push({
+        field: key,
+        before: beforeVal,
+        after: afterVal
+      });
+    }
+  }
+  
+  return changes;
+};
+
 // Changes Diff Component
-const ChangesDiff = ({ changes }) => {
+const ChangesDiff = ({ changes, action, targetType }) => {
   if (!changes) {
     return <span className="admin-no-changes">No changes recorded</span>;
   }
 
-  // Only display the custom change message if it exists
+  // Display custom change message if it exists
   if (changes.message) {
     return (
       <div className="admin-change-message">
@@ -126,18 +271,123 @@ const ChangesDiff = ({ changes }) => {
     );
   }
 
-  // If no custom message, show no changes
+  // Handle CREATE action - show created data
+  if (action === 'CREATE' && changes.created) {
+    const priorityFields = priorityFieldsByType[targetType] || [];
+    const data = changes.created;
+    const fieldsToShow = priorityFields.filter(f => data[f] !== undefined);
+    
+    return (
+      <div className="admin-changes-created">
+        <div className="admin-changes-section">
+          <span className="admin-changes-section-label admin-changes-section-label--created">Created with values:</span>
+          <div className="admin-changes-list">
+            {fieldsToShow.map(field => (
+              <div key={field} className="admin-change-item">
+                <span className="admin-change-field">{formatFieldName(field)}:</span>
+                <span className="admin-change-value admin-change-value--new">
+                  {formatValue(data[field], field)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle DELETE action - show deleted data
+  if (action === 'DELETE' && changes.deleted) {
+    const priorityFields = priorityFieldsByType[targetType] || [];
+    const data = changes.deleted;
+    const fieldsToShow = priorityFields.filter(f => data[f] !== undefined);
+    
+    return (
+      <div className="admin-changes-deleted">
+        <div className="admin-changes-section">
+          <span className="admin-changes-section-label admin-changes-section-label--deleted">Deleted data:</span>
+          <div className="admin-changes-list">
+            {fieldsToShow.map(field => (
+              <div key={field} className="admin-change-item">
+                <span className="admin-change-field">{formatFieldName(field)}:</span>
+                <span className="admin-change-value admin-change-value--old">
+                  {formatValue(data[field], field)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle UPDATE action with before/after
+  if (changes.before && changes.after) {
+    const changedFields = getChangedFields(changes.before, changes.after, targetType);
+    
+    if (changedFields.length === 0) {
+      return <span className="admin-no-changes">No significant changes detected</span>;
+    }
+    
+    // Check for plan change specifically
+    const planChanged = changes.planChanged;
+    
+    return (
+      <div className="admin-changes-diff">
+        {planChanged && (
+          <div className="admin-plan-change-notice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            Subscription plan was changed by admin
+          </div>
+        )}
+        <div className="admin-changes-grid">
+          {changedFields.map(({ field, before, after }) => (
+            <div key={field} className="admin-change-row">
+              <span className="admin-change-field">{formatFieldName(field)}</span>
+              <div className="admin-change-values">
+                <div className="admin-change-before">
+                  <span className="admin-change-label">Before:</span>
+                  <span className="admin-change-value admin-change-value--old">
+                    {formatValue(before, field)}
+                  </span>
+                </div>
+                <div className="admin-change-arrow">→</div>
+                <div className="admin-change-after">
+                  <span className="admin-change-label">After:</span>
+                  <span className="admin-change-value admin-change-value--new">
+                    {formatValue(after, field)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for other change formats
   return <span className="admin-no-changes">No changes recorded</span>;
 };
 
 // Log Row Component
 const LogRow = ({ log }) => {
   const [expanded, setExpanded] = useState(false);
-  const canExpand = log.action === 'UPDATE';
+  // Allow expansion for all actions that have changes
+  const canExpand = log.changes && (
+    log.changes.message || 
+    log.changes.before || 
+    log.changes.after || 
+    log.changes.created || 
+    log.changes.deleted
+  );
 
   return (
     <>
-      <tr className="admin-log-row" onClick={() => canExpand && setExpanded(!expanded)}>
+      <tr className={`admin-log-row ${canExpand ? 'admin-log-row--expandable' : ''}`} onClick={() => canExpand && setExpanded(!expanded)}>
         <td>
           <div className="admin-log-time">
             {formatDateTime(log.createdAt)}
@@ -180,9 +430,13 @@ const LogRow = ({ log }) => {
           <td colSpan="5">
             <div className="admin-log-details">
               <div className="admin-log-details-header">
-                <h4>Change Details</h4>
+                <h4>
+                  {log.action === 'CREATE' ? 'Created Data' : 
+                   log.action === 'DELETE' ? 'Deleted Data' : 
+                   'Change Details'}
+                </h4>
               </div>
-              <ChangesDiff changes={log.changes} />
+              <ChangesDiff changes={log.changes} action={log.action} targetType={log.targetType} />
             </div>
           </td>
         </tr>
@@ -205,36 +459,24 @@ const AuditLogsPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const LOGS_PER_PAGE = 20;
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams({
+      const params = {
         page: currentPage.toString(),
         limit: LOGS_PER_PAGE.toString()
-      });
+      };
 
-      if (searchQuery) params.append('search', searchQuery);
-      if (actionFilter !== 'all') params.append('action', actionFilter);
-      if (targetFilter !== 'all') params.append('targetType', targetFilter);
+      if (searchQuery) params.search = searchQuery;
+      if (actionFilter !== 'all') params.action = actionFilter;
+      if (targetFilter !== 'all') params.targetType = targetFilter;
 
-      const response = await fetch(`${API_URL}/api/admin/logs?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch audit logs');
-      }
-
-      const result = await response.json();
+      const { getAuditLogs } = await import('../../services/adminApi');
+      const result = await getAuditLogs(params);
+      
       // Backend returns { success: true, data: logs, pagination: ... }
       const logsData = result.data || result.logs || [];
       setLogs(Array.isArray(logsData) ? logsData : []);
@@ -245,7 +487,7 @@ const AuditLogsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, actionFilter, targetFilter, member, API_URL]);
+  }, [currentPage, searchQuery, actionFilter, targetFilter]);
 
   useEffect(() => {
     fetchLogs();

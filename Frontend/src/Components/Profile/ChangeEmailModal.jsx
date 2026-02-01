@@ -154,6 +154,7 @@ const ChangeEmailModal = ({ isOpen, onClose, currentEmail }) => {
                 id="currentPassword"
                 value={formData.currentPassword}
                 onChange={handleChange}
+                autoComplete="current-password"
                 required
               />
             </div>

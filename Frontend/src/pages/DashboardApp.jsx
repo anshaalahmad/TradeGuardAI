@@ -71,17 +71,12 @@ export default function DashboardApp() {
 
   // When a crypto is selected from the table, update tradingConfig and selectedCrypto
   const handleCryptoSelect = (coin, page) => {
-    console.log('Selected crypto:', coin);
     const coinSlug = coin.name.toLowerCase().replace(/\s+/g, '-');
     // Store current page in sessionStorage to restore later
     sessionStorage.setItem('crypto_list_page', page || currentPage);
     // Navigate using React Router
     navigate(`/cryptocurrency/${coinSlug}?from=list&page=${page || currentPage}`);
   };
-  // Debug: log selectedCrypto on every render
-  useEffect(() => {
-    console.log('DashboardApp selectedCrypto:', selectedCrypto);
-  }, [selectedCrypto]);
 
   // Handle navigation from sidebar
   const handleSidebarNavigate = (path, linkId) => {
@@ -108,7 +103,7 @@ export default function DashboardApp() {
     const fetchPriceChanges = async () => {
       try {
         const coinId = selectedCrypto.id || selectedCrypto.symbol.toLowerCase();
-        const response = await fetch(`http://localhost:4001/api/crypto/${coinId}`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/${coinId}`);
         
         if (!response.ok) {
           // If rate limited or error, keep existing values (don't reset to 0)
@@ -137,11 +132,11 @@ export default function DashboardApp() {
         }
       } catch (error) {
         // On error, keep existing values instead of resetting to 0
-        console.error('Error fetching price changes:', error.message);
       }
     };
     fetchPriceChanges();
-    const interval = setInterval(fetchPriceChanges, 30000);
+    // Poll every 60 seconds instead of 30 to reduce API calls
+    const interval = setInterval(fetchPriceChanges, 60000);
     return () => clearInterval(interval);
   }, [selectedCrypto]);
 

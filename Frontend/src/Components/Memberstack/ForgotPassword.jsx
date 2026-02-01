@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const ForgotPassword = ({ onClose }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { sendPasswordResetEmail, resetPassword } = useAuth();
   const [currentStep, setCurrentStep] = useState('forgot'); // 'forgot', 'reset', 'success'
   const [email, setEmail] = useState('');
@@ -31,6 +32,17 @@ const ForgotPassword = ({ onClose }) => {
       -webkit-text-fill-color: #000 !important;
     }
   `;
+
+  // Check for reset token in URL on mount
+  useEffect(() => {
+    const urlToken = searchParams.get('token');
+    const urlEmail = searchParams.get('email');
+    if (urlToken && urlEmail) {
+      setToken(urlToken);
+      setEmail(urlEmail);
+      setCurrentStep('reset');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Validate password requirements
@@ -80,7 +92,7 @@ const ForgotPassword = ({ onClose }) => {
     setIsLoading(true);
 
     try {
-      const result = await resetPassword(token, password);
+      const result = await resetPassword(email, token, password);
       
       if (result.success) {
         setCurrentStep('success');
@@ -160,7 +172,7 @@ const ForgotPassword = ({ onClose }) => {
                 id="Forgot-Email-2"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                data-ms-member="email"
+                autoComplete="email"
                 required
               />
             </div>
@@ -244,6 +256,7 @@ const ForgotPassword = ({ onClose }) => {
                   id="password-2"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
                   data-ms-member="password"
                   required
                 />
@@ -293,6 +306,7 @@ const ForgotPassword = ({ onClose }) => {
                   id="confirm-password-2"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
                   data-ms-member="password"
                   required
                 />

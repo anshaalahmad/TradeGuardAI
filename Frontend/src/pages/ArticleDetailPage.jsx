@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { apiRequest, getAccessToken } from '../services/api'
 import Sidebar from '../Components/Dashboard Pages/Sidebar'
 import Navbar from '../Components/Dashboard Pages/Navbar'
 
@@ -132,8 +133,11 @@ const ErrorState = ({ message, onBack }) => (
     </svg>
     <h2>Article Not Found</h2>
     <p>{message}</p>
-    <button className="button" onClick={onBack}>
-      ← Back to Learning Platform
+    <button className="button" onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Back to Learning Platform
     </button>
   </div>
 )
@@ -152,7 +156,7 @@ export default function ArticleDetailPage() {
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [bookmarkLoading, setBookmarkLoading] = useState(false)
   
-  const memberstackId = member?.id
+  const userId = member?.id
 
   // Fetch article
   const fetchArticle = useCallback(async () => {
@@ -187,23 +191,19 @@ export default function ArticleDetailPage() {
     }
   }, [slug])
 
-  // Check bookmark status
+  // Check bookmark status (requires authentication)
   const checkBookmarkStatus = useCallback(async () => {
-    if (!memberstackId || !article?.id) return
+    if (!userId || !article?.id || !getAccessToken()) return
     
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/resources/bookmarks/${memberstackId}/check?resourceType=ARTICLE&resourceId=${article.id}`
+      const data = await apiRequest(
+        `/api/resources/bookmarks/check?resourceType=ARTICLE&resourceId=${article.id}`
       )
-      
-      if (response.ok) {
-        const data = await response.json()
-        setIsBookmarked(data.data?.isBookmarked || false)
-      }
+      setIsBookmarked(data.data?.isBookmarked || false)
     } catch (err) {
       console.error('Error checking bookmark status:', err)
     }
-  }, [memberstackId, article?.id])
+  }, [userId, article?.id])
 
   // Initial load
   useEffect(() => {
@@ -217,9 +217,9 @@ export default function ArticleDetailPage() {
     }
   }, [article?.id, checkBookmarkStatus])
 
-  // Handle bookmark toggle
+  // Handle bookmark toggle (requires authentication)
   const handleBookmarkToggle = async () => {
-    if (!memberstackId) {
+    if (!userId || !getAccessToken()) {
       navigate('/login')
       return
     }
@@ -229,19 +229,15 @@ export default function ArticleDetailPage() {
     setBookmarkLoading(true)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/resources/bookmarks`, {
+      await apiRequest('/api/resources/bookmarks', {
         method: isBookmarked ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberstackId,
           resourceType: 'ARTICLE',
           resourceId: article.id
         })
       })
       
-      if (response.ok) {
-        setIsBookmarked(!isBookmarked)
-      }
+      setIsBookmarked(!isBookmarked)
     } catch (err) {
       console.error('Error toggling bookmark:', err)
     } finally {
@@ -418,9 +414,12 @@ export default function ArticleDetailPage() {
                   <button 
                     className="button is-secondary is-icon is-small"
                     onClick={() => navigate('/resources/learning')}
-                    style={{ width: '100%', justifyContent: 'center' }}
+                    style={{ width: '100%', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                   >
-                    ← Back to Learning Platform
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back to Learning Platform
                   </button>
                 </aside>
               </div>

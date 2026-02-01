@@ -16,8 +16,8 @@ const asyncHandler = (fn) => (req, res, next) => {
 
 // Helper to get admin info from request
 const getAdminInfo = (req) => ({
-  email: req.admin?.email || req.headers['x-admin-email'],
-  id: req.headers['x-admin-id'] || 'unknown',
+  email: req.admin?.email || req.user?.email || req.headers['x-admin-email'],
+  id: req.admin?.id || req.user?.userId || req.headers['x-admin-id'] || 'unknown',
   ipAddress: req.ip || req.connection?.remoteAddress,
   userAgent: req.headers['user-agent']
 });
@@ -76,12 +76,13 @@ router.get('/logs', requireAdmin, asyncHandler(async (req, res) => {
  * List all members with pagination
  */
 router.get('/members', requireAdmin, asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, search } = req.query;
+  const { page = 1, limit = 20, search, plan } = req.query;
 
   const result = await adminService.listMembers({
     page: parseInt(page),
     limit: parseInt(limit),
-    search
+    search,
+    plan
   });
 
   res.json({ 

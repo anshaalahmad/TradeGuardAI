@@ -1,47 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import coinOverrides from './coinOverrides';
+import { formatCurrency, formatPercent, getChangeColor } from '../../utils/formatters';
 
 const PAGE_SIZE = 10;
 const TOTAL_COINS = 50;
-
-const formatCurrency = (v) => {
-  if (v === null || v === undefined || Number.isNaN(v)) return '—';
-  if (typeof v !== 'number') return v;
-  
-  // For very small values, use subscript notation for leading zeros
-  if (v > 0 && v < 1) {
-    const str = v.toString();
-    const match = str.match(/^0\.(0+)([1-9]\d*)/);
-    
-    if (match && match[1].length >= 4) {
-      // Use subscript notation: $0.0₍₅₎57874
-      const leadingZeros = match[1].length;
-      const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
-      const significantDigits = match[2].substring(0, 5);
-      return `$0.0₍${subscriptZeros}₎${significantDigits}`;
-    }
-    
-    // For smaller numbers of leading zeros, show more decimals
-    if (v < 0.01) {
-      return `$${v.toFixed(8).replace(/\.?0+$/, '')}`;
-    }
-    return `$${v.toFixed(6).replace(/\.?0+$/, '')}`;
-  }
-  
-  return `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const formatPercent = (v) => {
-  if (v === null || v === undefined || Number.isNaN(v)) return '—';
-  return `${Math.abs(Number(v)).toFixed(2)}%`;
-};
 
 const renderChange = (v) => {
   if (v === null || v === undefined || Number.isNaN(v)) return <div className="text-size-regular">—</div>;
   const num = Number(v);
   const isUp = num >= 0;
-  const color = isUp ? '#16a34a' : '#dc2626';
+  const color = getChangeColor(num);
   return (
     <div className="text-size-regular" style={{ color, display: 'flex', alignItems: 'center', gap: 4 }}>
       <span style={{ display: 'flex', alignItems: 'center' }}>
@@ -88,7 +57,6 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
             const parsed = JSON.parse(cachedData);
             const age = Date.now() - parsed.timestamp;
             if (age < 120000) { // 2 minutes
-              console.log('[TopCryptoTable] Using cached data');
               processedCoins = parsed.coins;
               if (mounted) {
                 const startIdx = (page - 1) * PAGE_SIZE;
@@ -101,13 +69,12 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
               return;
             }
           } catch (e) {
-            console.warn('[TopCryptoTable] Cache parse error:', e);
             localStorage.removeItem(allCoinsCacheKey);
           }
         }
         
         // Always fetch the top 50 coins (page 1) to match CoinGecko exactly
-        const res = await fetch(`http://localhost:4001/api/crypto/list?page=1&limit=${TOTAL_COINS}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/crypto/list?page=1&limit=${TOTAL_COINS}`);
         
         if (!res.ok) {
           if (res.status === 429) {
@@ -141,7 +108,7 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
             total: processedCoins.length
           }));
         } catch (e) {
-          console.warn('[TopCryptoTable] Failed to cache all coins:', e);
+          // Cache write failed - non-critical
         }
         
         // Paginate the coins for display
@@ -153,7 +120,6 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
         setTotal(processedCoins.length);
       } catch (err) {
         if (!mounted) return;
-        console.error('[TopCryptoTable] Error:', err);
         
         // Try to use any cached data (even stale) on error
         const allCoinsCache = localStorage.getItem('top_crypto_all_coins');
@@ -172,7 +138,7 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
               return;
             }
           } catch (e) {
-            console.warn('[TopCryptoTable] Could not use cached data:', e);
+            // Cached data unusable - continue to error state
           }
         }
         
@@ -487,4 +453,4 @@ const TopCryptoTable = ({ onCryptoSelect, initialPage = 1 }) => {
   );
 };
 
-export default TopCryptoTable;
+export default memo(TopCryptoTable);

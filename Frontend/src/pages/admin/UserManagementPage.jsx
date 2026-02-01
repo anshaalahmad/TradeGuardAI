@@ -64,12 +64,11 @@ const formatDate = (dateString) => {
   });
 };
 
-// Available plans
+// Available plans - matches PlanTier enum in Prisma schema
 const PLANS = [
-  { id: 'free', name: 'Free', color: '#6b7280' },
-  { id: 'basic', name: 'Basic', color: '#3b82f6' },
-  { id: 'pro', name: 'Pro', color: '#1e65fa' },
-  { id: 'enterprise', name: 'Enterprise', color: '#f59e0b' }
+  { id: 'FREE', name: 'Free', color: '#6b7280' },
+  { id: 'PRO', name: 'Pro', color: '#1e65fa' },
+  { id: 'API_PLAN', name: 'API Plan', color: '#f59e0b' }
 ];
 
 // Edit User Modal
@@ -77,7 +76,7 @@ const EditUserModal = ({ user, onClose, onSave, saving }) => {
   const [formData, setFormData] = useState({
     firstName: user?.customFields?.firstName || '',
     lastName: user?.customFields?.lastName || '',
-    planId: user?.planConnections?.[0]?.planId || 'free',
+    planTier: user?.subscription?.planTier || 'FREE',
     verified: user?.verified || false,
     customFields: { ...user?.customFields }
   });
@@ -108,87 +107,176 @@ const EditUserModal = ({ user, onClose, onSave, saving }) => {
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal" onClick={e => e.stopPropagation()}>
         <div className="admin-modal-header">
-          <h2>Edit User</h2>
+          <div className="admin-modal-header-content">
+            <h2>Edit User</h2>
+            <p className="admin-modal-subtitle">{user?.auth?.email}</p>
+          </div>
           <button className="admin-modal-close" onClick={onClose}>
             <CloseIcon />
           </button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="admin-modal-body">
-            <div className="admin-form-group">
-              <label>Email</label>
-              <input
-                type="text"
-                value={user?.auth?.email || ''}
-                disabled
-                className="admin-input admin-input--disabled"
-              />
-              <span className="admin-input-hint">Email cannot be changed</span>
-            </div>
+            {/* User Identity Section */}
+            <div className="admin-form-section">
+              <div className="admin-form-section-header">
+                <h3>User Information</h3>
+              </div>
+              
+              <div className="admin-form-row">
+                <div className="admin-form-group">
+                  <label>First Name</label>
+                  <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={e => handleCustomFieldChange('firstName', e.target.value)}
+                    className="admin-input"
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label>Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={e => handleCustomFieldChange('lastName', e.target.value)}
+                    className="admin-input"
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
 
-            <div className="admin-form-row">
               <div className="admin-form-group">
-                <label>First Name</label>
+                <label>Email Address</label>
                 <input
                   type="text"
-                  value={formData.firstName}
-                  onChange={e => handleCustomFieldChange('firstName', e.target.value)}
-                  className="admin-input"
-                  placeholder="First name"
+                  value={user?.auth?.email || ''}
+                  disabled
+                  className="admin-input admin-input--disabled"
                 />
+                <span className="admin-input-hint">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block', marginRight: '4px' }}>
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                  </svg>
+                  Email cannot be changed
+                </span>
               </div>
+
               <div className="admin-form-group">
-                <label>Last Name</label>
-                <input
-                  type="text"
-                  value={formData.lastName}
-                  onChange={e => handleCustomFieldChange('lastName', e.target.value)}
-                  className="admin-input"
-                  placeholder="Last name"
+                <label className="admin-checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    checked={formData.verified}
+                    onChange={e => handleChange('verified', e.target.checked)}
+                    className="admin-checkbox"
+                  />
+                  <span className="admin-checkbox-label-text">
+                    <span className="admin-checkbox-label-title">Email Verified</span>
+                    <span className="admin-checkbox-label-desc">User has verified their email address</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Subscription Section */}
+            <div className="admin-form-section">
+              <div className="admin-form-section-header">
+                <h3>Subscription & Access</h3>
+              </div>
+
+              <div className="admin-form-group">
+                <label>Plan Tier</label>
+                <CustomSelect
+                  value={formData.planTier}
+                  onChange={(value) => handleChange('planTier', value)}
+                  options={PLANS.map(plan => ({ value: plan.id, label: plan.name }))}
                 />
+                
+                {formData.planTier !== (user?.subscription?.planTier || 'FREE') && (
+                  <div className={`admin-notice ${formData.planTier === 'FREE' ? 'admin-notice--warning' : 'admin-notice--success'}`}>
+                    <div className="admin-notice-icon">
+                      {formData.planTier === 'FREE' ? '⚠️' : '✓'}
+                    </div>
+                    <div className="admin-notice-content">
+                      <div className="admin-notice-title">
+                        {formData.planTier === 'FREE' ? 'Plan Downgrade' : 'Plan Upgrade'}
+                      </div>
+                      <div className="admin-notice-text">
+                        {formData.planTier === 'FREE' 
+                          ? 'User will lose access to paid features immediately.'
+                          : `User will receive ${PLANS.find(p => p.id === formData.planTier)?.name} features without payment.`
+                        }
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {user?.subscription && !user.subscription.stripeSubscriptionId && user.subscription.planTier !== 'FREE' && (
+                  <div className="admin-badge admin-badge--success">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    Admin-granted (no payment required)
+                  </div>
+                )}
+                
+                {user?.subscription?.stripeSubscriptionId && (
+                  <div className="admin-badge admin-badge--neutral">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                      <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                    Stripe-managed subscription
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="admin-form-group">
-              <label>Subscription Plan</label>
-              <CustomSelect
-                value={formData.planId}
-                onChange={(value) => handleChange('planId', value)}
-                options={PLANS.map(plan => ({ value: plan.id, label: plan.name }))}
-              />
-            </div>
-
-            <label className="admin-checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.verified}
-                onChange={e => handleChange('verified', e.target.checked)}
-                className="admin-checkbox"
-              />
-              Email Verified
-            </label>
-
-            <div className="admin-user-info">
-              <div className="admin-user-info-row">
-                <span>Member ID:</span>
-                <code>{user?.id}</code>
+            {/* Account Details Section */}
+            <div className="admin-form-section">
+              <div className="admin-form-section-header">
+                <h3>Account Details</h3>
               </div>
-              <div className="admin-user-info-row">
-                <span>Joined:</span>
-                <span>{formatDate(user?.createdAt)}</span>
-              </div>
-              <div className="admin-user-info-row">
-                <span>Last Login:</span>
-                <span>{formatDate(user?.lastLogin)}</span>
+              
+              <div className="admin-info-grid">
+                <div className="admin-info-item">
+                  <span className="admin-info-label">Member ID</span>
+                  <span className="admin-info-value admin-info-value--mono">{user?.id}</span>
+                </div>
+                <div className="admin-info-item">
+                  <span className="admin-info-label">Joined</span>
+                  <span className="admin-info-value">{formatDate(user?.createdAt)}</span>
+                </div>
+                <div className="admin-info-item">
+                  <span className="admin-info-label">Last Login</span>
+                  <span className="admin-info-value">{formatDate(user?.lastLogin)}</span>
+                </div>
+                {user?.subscription?.currentPeriodEnd && (
+                  <div className="admin-info-item">
+                    <span className="admin-info-label">Plan Expires</span>
+                    <span className="admin-info-value">{formatDate(user.subscription.currentPeriodEnd)}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+          
           <div className="admin-modal-footer">
             <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? (
+                <>
+                  <svg className="admin-btn-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
             </button>
           </div>
         </form>
@@ -255,7 +343,6 @@ const UserManagementPage = () => {
   const [deleting, setDeleting] = useState(false);
 
   const USERS_PER_PAGE = 10;
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -270,20 +357,9 @@ const UserManagementPage = () => {
       if (searchQuery) params.append('search', searchQuery);
       if (planFilter !== 'all') params.append('plan', planFilter);
 
-      const response = await fetch(`${API_URL}/api/admin/members?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch users');
-      }
-
-      const result = await response.json();
+      const { getUsers } = await import('../../services/adminApi');
+      const result = await getUsers(Object.fromEntries(params));
+      
       // Backend returns { success: true, data: members, pagination: ... }
       const members = result.data || result.members || [];
       setUsers(Array.isArray(members) ? members : []);
@@ -295,7 +371,7 @@ const UserManagementPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, planFilter, member, API_URL]);
+  }, [currentPage, searchQuery, planFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -306,8 +382,8 @@ const UserManagementPage = () => {
     setCurrentPage(1);
   };
 
-  const handlePlanFilter = (e) => {
-    setPlanFilter(e.target.value);
+  const handlePlanFilter = (value) => {
+    setPlanFilter(value);
     setCurrentPage(1);
   };
 
@@ -315,20 +391,8 @@ const UserManagementPage = () => {
     try {
       setSaving(true);
       
-      const response = await fetch(`${API_URL}/api/admin/members/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update user');
-      }
+      const { updateUser } = await import('../../services/adminApi');
+      await updateUser(userId, formData);
 
       setEditingUser(null);
       fetchUsers();
@@ -344,19 +408,8 @@ const UserManagementPage = () => {
     try {
       setDeleting(true);
       
-      const response = await fetch(`${API_URL}/api/admin/members/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete user');
-      }
+      const { deleteUser } = await import('../../services/adminApi');
+      await deleteUser(userId);
 
       setDeletingUser(null);
       fetchUsers();
@@ -375,19 +428,54 @@ const UserManagementPage = () => {
   };
 
   const getPlanBadge = (user) => {
-    const planConnection = user?.planConnections?.[0];
-    if (!planConnection) {
-      return <span className="admin-plan-badge" style={{ background: '#f3f4f6', color: '#6b7280', borderColor: '#e5e7eb' }}>No Plan</span>;
-    }
+    // Get plan tier from subscription data
+    const planTier = user?.subscription?.planTier || 'FREE';
+    const plan = PLANS.find(p => p.id === planTier) || PLANS[0];
     
-    const plan = PLANS.find(p => p.id === planConnection.planId) || PLANS[0];
+    // Show subscription status indicator if not active
+    const status = user?.subscription?.status;
+    const isActive = !status || status === 'ACTIVE' || status === 'TRIALING';
+    
+    // Check if admin-granted (no Stripe subscription but has paid plan)
+    const isAdminGranted = !user?.subscription?.stripeSubscriptionId && planTier !== 'FREE';
+    
+    // Build tooltip text
+    let tooltipText = '';
+    if (!isActive) tooltipText = `Status: ${status}`;
+    else if (isAdminGranted) tooltipText = 'Admin-granted (no payment)';
+    else if (user?.subscription?.stripeSubscriptionId) tooltipText = 'Stripe subscription';
+    
     return (
-      <span 
-        className="admin-plan-badge" 
-        style={{ background: `${plan.color}20`, color: plan.color, borderColor: `${plan.color}40` }}
-      >
-        {planConnection.planName || plan.name}
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span 
+          className="admin-plan-badge" 
+          style={{ 
+            background: `${plan.color}20`, 
+            color: plan.color, 
+            borderColor: `${plan.color}40`,
+            opacity: isActive ? 1 : 0.6
+          }}
+          title={tooltipText}
+        >
+          {plan.name}
+          {!isActive && <span style={{ marginLeft: '4px', fontSize: '0.7em' }}>({status})</span>}
+        </span>
+        {isAdminGranted && (
+          <span 
+            style={{ 
+              fontSize: '0.65rem', 
+              color: '#16a34a', 
+              background: '#f0fdf4',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: '1px solid #bbf7d0'
+            }}
+            title="This plan was granted by an admin"
+          >
+            Admin
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -475,7 +563,8 @@ const UserManagementPage = () => {
             {/* Users Table */}
             {!loading && !error && (
               <>
-                <div className="admin-table-container">
+                {/* Desktop Table View */}
+                <div className="admin-table-container admin-desktop-only">
                   <table className="admin-table">
                     <thead>
                       <tr>
@@ -547,6 +636,88 @@ const UserManagementPage = () => {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="admin-mobile-only">
+                  {users.length > 0 ? (
+                    <div className="admin-user-cards">
+                      {users.map(user => (
+                        <div key={user.id} className="admin-user-card">
+                          {/* Card Header */}
+                          <div className="admin-user-card-header">
+                            <div className="admin-user-card-avatar">
+                              {(user.customFields?.firstName?.[0] || user.auth?.email?.[0] || 'U').toUpperCase()}
+                            </div>
+                            <div className="admin-user-card-identity">
+                              <span className="admin-user-card-name">
+                                {user.customFields?.firstName 
+                                  ? `${user.customFields.firstName} ${user.customFields.lastName || ''}`
+                                  : 'No name'
+                                }
+                              </span>
+                              <span className="admin-user-card-email">{user.auth?.email}</span>
+                            </div>
+                            <div className="admin-user-card-actions">
+                              <button 
+                                className="admin-icon-btn"
+                                onClick={() => setEditingUser(user)}
+                                title="Edit User"
+                              >
+                                <EditIcon />
+                              </button>
+                              <button 
+                                className="admin-icon-btn admin-icon-btn--danger"
+                                onClick={() => setDeletingUser(user)}
+                                title="Delete User"
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Card Body */}
+                          <div className="admin-user-card-body">
+                            <div className="admin-user-card-row">
+                              <span className="admin-user-card-label">Plan</span>
+                              <div className="admin-user-card-value">{getPlanBadge(user)}</div>
+                            </div>
+                            <div className="admin-user-card-row">
+                              <span className="admin-user-card-label">Status</span>
+                              <span className={`admin-status ${user.verified ? 'admin-status--verified' : 'admin-status--unverified'}`}>
+                                {user.verified ? 'Verified' : 'Unverified'}
+                              </span>
+                            </div>
+                            <div className="admin-user-card-row">
+                              <span className="admin-user-card-label">Joined</span>
+                              <span className="admin-user-card-value">{formatDate(user.createdAt)}</span>
+                            </div>
+                            <div className="admin-user-card-row">
+                              <span className="admin-user-card-label">Last Login</span>
+                              <span className="admin-user-card-value">{formatDate(user.lastLogin)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="admin-empty-state">
+                      <div className="admin-empty-state-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                      </div>
+                      <p className="admin-empty-state-text">
+                        {searchQuery || planFilter !== 'all' 
+                          ? 'No users match your filters'
+                          : 'No users found'
+                        }
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pagination */}

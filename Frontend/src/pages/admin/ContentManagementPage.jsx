@@ -131,76 +131,48 @@ const ContentManagementPage = () => {
   const [deletingItem, setDeletingItem] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
-
   // Fetch counts for both tabs
   const fetchCounts = useCallback(async () => {
     try {
-      const [articlesRes, patternsRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/articles`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Email': member?.auth?.email || '',
-            'X-Admin-Id': member?.id || ''
-          }
-        }),
-        fetch(`${API_URL}/api/admin/patterns`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Email': member?.auth?.email || '',
-            'X-Admin-Id': member?.id || ''
-          }
-        })
+      const { getArticles, getPatterns } = await import('../../services/adminApi');
+      
+      const [articlesData, patternsData] = await Promise.all([
+        getArticles().catch(() => ({ data: [] })),
+        getPatterns().catch(() => ({ data: [] }))
       ]);
 
-      if (articlesRes.ok) {
-        const articlesData = await articlesRes.json();
-        const articles = articlesData.data || articlesData.articles || articlesData;
-        setArticlesCount(Array.isArray(articles) ? articles.length : 0);
-      }
+      const articles = articlesData.data || articlesData.articles || articlesData || [];
+      setArticlesCount(Array.isArray(articles) ? articles.length : 0);
 
-      if (patternsRes.ok) {
-        const patternsData = await patternsRes.json();
-        const patterns = patternsData.data || patternsData.patterns || patternsData;
-        setPatternsCount(Array.isArray(patterns) ? patterns.length : 0);
-      }
+      const patterns = patternsData.data || patternsData.patterns || patternsData || [];
+      setPatternsCount(Array.isArray(patterns) ? patterns.length : 0);
     } catch (err) {
       console.error('Error fetching counts:', err);
     }
-  }, [member, API_URL]);
+  }, []);
 
   const fetchContent = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const endpoint = activeTab === 'articles' ? 'articles' : 'patterns';
-      const params = new URLSearchParams();
-      if (searchQuery) params.append('search', searchQuery);
+      const { getArticles, getPatterns } = await import('../../services/adminApi');
+      
+      const params = {};
+      if (searchQuery) params.search = searchQuery;
       if (statusFilter !== 'all') {
         if (activeTab === 'articles') {
           // For articles, map status to published boolean
-          params.append('published', statusFilter === 'published' ? 'true' : 'false');
+          params.published = statusFilter === 'published' ? 'true' : 'false';
         } else {
-          params.append('status', statusFilter);
+          params.status = statusFilter;
         }
       }
-      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (categoryFilter !== 'all') params.category = categoryFilter;
 
-      const response = await fetch(`${API_URL}/api/admin/${endpoint}?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to fetch ${endpoint}`);
-      }
-
-      const data = await response.json();
+      const data = activeTab === 'articles' 
+        ? await getArticles(params)
+        : await getPatterns(params);
       
       if (activeTab === 'articles') {
         // Backend returns { success: true, data: articles }
@@ -233,7 +205,7 @@ const ContentManagementPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, searchQuery, statusFilter, categoryFilter, member, API_URL]);
+  }, [activeTab, searchQuery, statusFilter, categoryFilter]);
 
   useEffect(() => {
     fetchContent();
@@ -258,20 +230,12 @@ const ContentManagementPage = () => {
   const handleDelete = async (id) => {
     try {
       setDeleting(true);
-      const endpoint = activeTab === 'articles' ? 'articles' : 'patterns';
+      const { deleteArticle, deletePattern } = await import('../../services/adminApi');
       
-      const response = await fetch(`${API_URL}/api/admin/${endpoint}/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete');
+      if (activeTab === 'articles') {
+        await deleteArticle(id);
+      } else {
+        await deletePattern(id);
       }
 
       setDeletingItem(null);

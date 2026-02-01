@@ -404,6 +404,7 @@ export default function RichTextEditor({
           border-radius: 0.5rem;
           overflow: hidden;
           background: white;
+          min-width: 0;
         }
 
         .rte-toolbar {
@@ -429,6 +430,29 @@ export default function RichTextEditor({
           font-size: 0.75rem;
           font-weight: 600;
           transition: all 0.15s ease;
+          flex-shrink: 0;
+        }
+
+        @media (max-width: 767px) {
+          .rte-toolbar {
+            gap: 0.125rem;
+            padding: 0.375rem;
+          }
+          
+          .rte-toolbar-btn {
+            width: 28px;
+            height: 28px;
+            font-size: 0.6875rem;
+          }
+          
+          .rte-toolbar-separator {
+            margin: 2px 0.125rem;
+            height: 20px;
+          }
+          
+          .rte-content {
+            padding: 0.75rem;
+          }
         }
 
         .rte-toolbar-btn:hover:not(:disabled) {
@@ -565,7 +589,15 @@ export default function RichTextEditor({
           border-radius: 0.75rem;
           width: 100%;
           max-width: 400px;
+          margin: 1rem;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        @media (max-width: 480px) {
+          .rte-modal {
+            padding: 1.25rem;
+            margin: 0.75rem;
+          }
         }
 
         .rte-modal h3 {

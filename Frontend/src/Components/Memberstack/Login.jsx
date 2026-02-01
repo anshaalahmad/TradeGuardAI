@@ -54,32 +54,18 @@ const Login = ({ onClose, showCloseButton = true }) => {
     if (error) setError('');
   };
 
-  const handleGoogleLogin = async (e) => {
+  const handleGoogleLogin = (e) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
-
-    try {
-      const result = await loginWithGoogle();
-      
-      if (result.success) {
-        if (onClose) onClose();
-        navigate('/dashboard');
-      } else {
-        setError(result.error || 'Google login failed.');
-      }
-    } catch (err) {
-      setError('Google login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // This redirects to Google OAuth - no loading state needed as page navigates away
+    loginWithGoogle();
   };
 
   return (
     <>
       <style>{autofillStyles}</style>
       <div className="main_form_block w-form">
-        <form onSubmit={handleSubmit} className="main_form" data-ms-form="login">
+        <form onSubmit={handleSubmit} className="main_form">
           <h2 className="heading-style-h3">Login</h2>
           
           {error && (
@@ -109,7 +95,6 @@ const Login = ({ onClose, showCloseButton = true }) => {
                 id="Email-Five-2"
                 value={formData.email}
                 onChange={handleChange}
-                data-ms-member="email"
                 required
               />
             </div>
@@ -129,7 +114,7 @@ const Login = ({ onClose, showCloseButton = true }) => {
                 id="Password-Five-2"
                 value={formData.password}
                 onChange={handleChange}
-                data-ms-member="password"
+                autoComplete="current-password"
                 required
               />
             </div>
@@ -137,7 +122,6 @@ const Login = ({ onClose, showCloseButton = true }) => {
           <div className="main_form_footer">
             <input 
               type="submit" 
-              data-wait="Please wait..." 
               className="button is-full-width w-button"
               value={isLoading ? 'Please wait...' : 'Submit'}
               disabled={isLoading}
@@ -148,14 +132,13 @@ const Login = ({ onClose, showCloseButton = true }) => {
               <div className="main_form_divider_line"></div>
             </div>
             <a 
-              data-ms-auth-provider="google" 
               href="#" 
               onClick={handleGoogleLogin} 
               className="main_form_social_button w-inline-block"
             >
               <div className="ms-social-inner ms-is-center">
                 <img alt="" loading="lazy" src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/6936e975945489a24f875895_b7727941c0e8a117b6cfd8f06a1cb7ed_google.svg" className="ms-social-image" />
-                <div data-ms-auth-connected-text="Disconnect Google" className="ms-social-text">
+                <div className="ms-social-text">
                   Continue with Google
                 </div>
               </div>

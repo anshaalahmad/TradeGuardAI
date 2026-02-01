@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { apiRequest, getAccessToken } from '../services/api'
 import Sidebar from '../Components/Dashboard Pages/Sidebar'
 import Navbar from '../Components/Dashboard Pages/Navbar'
 
@@ -194,7 +195,7 @@ export default function LearningPlatformPage() {
   const [bookmarkLoading, setBookmarkLoading] = useState({})
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 })
   
-  const memberstackId = member?.id
+  const userId = member?.id
 
   // Fetch articles
   const fetchArticles = useCallback(async (category = 'all', page = 1) => {
@@ -230,23 +231,19 @@ export default function LearningPlatformPage() {
     }
   }, [])
 
-  // Fetch user bookmarks
+  // Fetch user bookmarks (requires authentication)
   const fetchBookmarks = useCallback(async () => {
-    if (!memberstackId) return
+    if (!userId || !getAccessToken()) return
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/resources/bookmarks/${memberstackId}/ids`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setBookmarks(data.data)
-        }
+      const data = await apiRequest('/api/resources/bookmarks/ids')
+      if (data.success) {
+        setBookmarks(data.data)
       }
     } catch (err) {
       console.error('Error fetching bookmarks:', err)
     }
-  }, [memberstackId])
+  }, [userId])
 
   // Initial load
   useEffect(() => {
@@ -261,9 +258,9 @@ export default function LearningPlatformPage() {
     fetchArticles(categoryId, 1)
   }
 
-  // Handle bookmark toggle
+  // Handle bookmark toggle (requires authentication)
   const handleBookmarkToggle = async (articleId) => {
-    if (!memberstackId) {
+    if (!userId || !getAccessToken()) {
       navigate('/login')
       return
     }
@@ -274,22 +271,18 @@ export default function LearningPlatformPage() {
     setBookmarkLoading(prev => ({ ...prev, [articleId]: true }))
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/resources/bookmarks`, {
+      await apiRequest('/api/resources/bookmarks', {
         method: isCurrentlyBookmarked ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberstackId,
           resourceType: 'ARTICLE',
           resourceId: articleId
         })
       })
       
-      if (response.ok) {
-        setBookmarks(prev => ({
-          ...prev,
-          [bookmarkKey]: !isCurrentlyBookmarked
-        }))
-      }
+      setBookmarks(prev => ({
+        ...prev,
+        [bookmarkKey]: !isCurrentlyBookmarked
+      }))
     } catch (err) {
       console.error('Error toggling bookmark:', err)
     } finally {

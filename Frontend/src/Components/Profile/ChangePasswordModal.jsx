@@ -70,25 +70,16 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
     setError('');
 
     try {
-      console.log('Attempting password change...');
-      console.log('Current password length:', formData.currentPassword?.length);
-      console.log('New password length:', formData.newPassword?.length);
-      console.log('Available memberstack methods:', Object.keys(window.memberstack || {}));
       const result = await updateMemberAuth(formData.currentPassword, null, formData.newPassword);
-      console.log('Password change result:', result);
       
       if (result.success) {
         setSuccess(true);
         // Log out user after password change so they can log in with new password
         setTimeout(async () => {
-          console.log('Logging out after password change...');
-          const logoutResult = await logout();
-          console.log('Logout result:', logoutResult);
-          console.log('Navigating to login page...');
+          await logout();
           navigate('/login');
         }, 2000);
       } else {
-        console.error('Password change failed:', result.error);
         setError(result.error || 'Failed to update password.');
       }
     } catch (err) {
@@ -166,6 +157,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
                 id="currentPassword"
                 value={formData.currentPassword}
                 onChange={handleChange}
+                autoComplete="current-password"
                 required
               />
             </div>
@@ -180,6 +172,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
                 id="newPassword"
                 value={formData.newPassword}
                 onChange={handleChange}
+                autoComplete="new-password"
                 minLength="8"
                 required
               />
@@ -232,6 +225,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
                 id="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
+                autoComplete="new-password"
                 minLength="8"
                 required
               />

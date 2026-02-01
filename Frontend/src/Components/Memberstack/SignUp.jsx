@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import VerificationCodeInput from '../Auth/VerificationCodeInput';
 
 const SignUp = ({ onClose, showCloseButton = true }) => {
   const navigate = useNavigate();
-  const { signup, signupWithGoogle } = useAuth();
+  const { 
+    initiateSignup, 
+    verifyRegistration, 
+    resendVerificationCode,
+    cancelRegistration,
+    pendingRegistration,
+    loginWithGoogle 
+  } = useAuth();
+  
+  const [step, setStep] = useState('form'); // 'form' or 'verify'
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -12,11 +22,11 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const [passwordValidation, setPasswordValidation] = useState({
     length: false,
     number: false,
-    special: false,
     capital: false
   });
 
@@ -32,13 +42,27 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
     }
   `;
 
+  // Sync with pending registration state
+  useEffect(() => {
+    if (pendingRegistration) {
+      setStep('verify');
+    }
+  }, [pendingRegistration]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
   useEffect(() => {
     // Validate password requirements
     const password = formData.password;
     setPasswordValidation({
       length: password.length >= 8,
       number: /\d/.test(password),
-      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
       capital: /[A-Z]/.test(password)
     });
   }, [formData.password]);
@@ -57,13 +81,21 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
     setIsLoading(true);
 
     try {
-      const result = await signup(formData.email, formData.password, {
-        'first-name': formData.name
-      });
+      // Split name into first and last name
+      const nameParts = formData.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      const result = await initiateSignup(
+        formData.email, 
+        formData.password, 
+        firstName,
+        lastName
+      );
       
       if (result.success) {
-        if (onClose) onClose();
-        navigate('/app');
+        setStep('verify');
+        setResendCooldown(60); // 60 second cooldown for resend
       } else {
         setError(result.error || 'Signup failed. Please try again.');
       }
@@ -72,6 +104,53 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVerificationComplete = async (code) => {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const result = await verifyRegistration(code);
+      
+      if (result.success) {
+        if (onClose) onClose();
+        navigate('/app');
+      } else {
+        setError(result.error || 'Verification failed. Please try again.');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const result = await resendVerificationCode();
+      
+      if (result.success) {
+        setResendCooldown(60);
+      } else {
+        setError(result.error || 'Failed to resend code.');
+      }
+    } catch (err) {
+      setError('Failed to resend code. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToForm = () => {
+    cancelRegistration();
+    setStep('form');
+    setError('');
   };
 
   const handleChange = (e) => {
@@ -83,32 +162,102 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
     if (error) setError('');
   };
 
-  const handleGoogleSignup = async (e) => {
+  const handleGoogleSignup = (e) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
-
-    try {
-      const result = await signupWithGoogle();
-      
-      if (result.success) {
-        if (onClose) onClose();
-        navigate('/dashboard');
-      } else {
-        setError(result.error || 'Google signup failed.');
-      }
-    } catch (err) {
-      setError('Google signup failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // This redirects to Google OAuth - no loading state needed
+    loginWithGoogle();
   };
 
+  // Verification step UI
+  if (step === 'verify') {
+    return (
+      <>
+        <style>{autofillStyles}</style>
+        <div className="main_form_block w-form">
+          <div className="main_form">
+            <div className="main_form_header">
+              <h1 className="heading-style-h3">Verify Your Email</h1>
+              <div className="text-size-regular" style={{ marginTop: '0.5rem' }}>
+                We've sent a 6-digit verification code to<br />
+                <strong>{pendingRegistration?.email || formData.email}</strong>
+              </div>
+            </div>
+            
+            {error && (
+              <div style={{ 
+                padding: '0.75rem', 
+                marginBottom: '1rem', 
+                backgroundColor: '#fee', 
+                color: '#c33', 
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem'
+              }}>
+                {error}
+              </div>
+            )}
+            
+            <div style={{ padding: '1.5rem 0' }}>
+              <VerificationCodeInput
+                length={6}
+                onComplete={handleVerificationComplete}
+                disabled={isLoading}
+                error={null}
+                autoFocus={true}
+              />
+            </div>
+            
+            <div className="main_form_footer">
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <span className="text-size-regular">Didn't receive the code? </span>
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={resendCooldown > 0 || isLoading}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: resendCooldown > 0 ? '#888' : '#007bff',
+                    cursor: resendCooldown > 0 ? 'default' : 'pointer',
+                    padding: 0,
+                    fontSize: 'inherit',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                </button>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleBackToForm}
+                className="button is-secondary is-full-width w-button"
+                style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back to signup
+              </button>
+            </div>
+            
+            {showCloseButton && (
+              <div className="main_form_close_button" onClick={onClose} style={{ cursor: 'pointer' }}>
+                <img src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/696807b39a055f53b4271712_close_black_24dp.svg" loading="lazy" alt="" className="main_form_close_icon" />
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Initial signup form
   return (
     <>
       <style>{autofillStyles}</style>
       <div className="main_form_block w-form">
-        <form onSubmit={handleSubmit} className="main_form" data-ms-form="signup">
+        <form onSubmit={handleSubmit} className="main_form">
           <h1 className="heading-style-h3">Signup</h1>
           
           {error && (
@@ -138,7 +287,6 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
                 id="Name-Two-2"
                 value={formData.name}
                 onChange={handleChange}
-                data-ms-member="first-name"
                 required
               />
             </div>
@@ -155,7 +303,6 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
                 id="Email-One-2"
                 value={formData.email}
                 onChange={handleChange}
-                data-ms-member="email"
                 required
               />
             </div>
@@ -172,7 +319,7 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
                 id="Password-One-2"
                 value={formData.password}
                 onChange={handleChange}
-                data-ms-member="password"
+                autoComplete="new-password"
                 required
               />
               <div className="update_password-check">
@@ -182,25 +329,19 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
                 <ul role="list" className="login-list">
                   <li
                     id="length-6"
-                    className="password-requirements"
+                    className={`password-requirements ${passwordValidation.length ? 'is-valid' : ''}`}
                   >
                     A minimum of 8 characters.
                   </li>
                   <li
                     id="number-6"
-                    className="password-requirements"
+                    className={`password-requirements ${passwordValidation.number ? 'is-valid' : ''}`}
                   >
                     At least one number
                   </li>
                   <li
-                    id="special-6"
-                    className="password-requirements"
-                  >
-                    At least 1 special character
-                  </li>
-                  <li
                     id="capital-6"
-                    className="password-requirements"
+                    className={`password-requirements ${passwordValidation.capital ? 'is-valid' : ''}`}
                   >
                     At least one uppercase letter
                   </li>
@@ -211,11 +352,27 @@ const SignUp = ({ onClose, showCloseButton = true }) => {
           <div className="main_form_footer">
             <input 
               type="submit" 
-              data-wait="Please wait..." 
               className="button is-full-width w-button"
-              value={isLoading ? 'Please wait...' : 'Submit'}
+              value={isLoading ? 'Please wait...' : 'Continue'}
               disabled={isLoading}
             />
+            <div className="main_form_divider">
+              <div className="main_form_divider_line"></div>
+              <div className="main_form_divider_text">OR</div>
+              <div className="main_form_divider_line"></div>
+            </div>
+            <a 
+              href="#" 
+              onClick={handleGoogleSignup} 
+              className="main_form_social_button w-inline-block"
+            >
+              <div className="ms-social-inner ms-is-center">
+                <img alt="" loading="lazy" src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/6936e975945489a24f875895_b7727941c0e8a117b6cfd8f06a1cb7ed_google.svg" className="ms-social-image" />
+                <div className="ms-social-text">
+                  Continue with Google
+                </div>
+              </div>
+            </a>
           </div>
           
           {showCloseButton && (

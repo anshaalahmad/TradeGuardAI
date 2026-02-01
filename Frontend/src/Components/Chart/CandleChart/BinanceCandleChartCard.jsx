@@ -1,65 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, memo } from 'react'
 import { initBinanceCandleChart } from './CandleChart'
 import { isBinanceSymbolSupported } from '../../../utils/binanceSymbols';
+import { formatPrice, getChangeClass } from '../../../utils/formatters';
 
 function getCryptoLogoUrl(symbol) {
   const sym = String(symbol || '').toLowerCase()
   // Use proxied endpoint to hide API key
   return `/api/logo/${sym}`
-}
-
-function formatCurrency(value) {
-  try {
-    const num = parseFloat(value);
-    if (isNaN(num)) return '$0.00';
-    
-    // For very small values, use subscript notation for leading zeros
-    if (num > 0 && num < 1) {
-      const str = num.toString();
-      const match = str.match(/^0\.(0+)([1-9]\d*)/);
-      
-      if (match && match[1].length >= 4) {
-        // Use subscript notation: $0.0₍₅₎57874
-        const leadingZeros = match[1].length;
-        const subscriptZeros = leadingZeros.toString().split('').map(d => '₀₁₂₃₄₅₆₇₈₉'[d]).join('');
-        const significantDigits = match[2].substring(0, 5);
-        return `$0.0₍${subscriptZeros}₎${significantDigits}`;
-      }
-      
-      // For smaller numbers of leading zeros, show more decimals
-      if (num < 0.01) {
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 6,
-          maximumFractionDigits: 8,
-        }).format(num);
-      }
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 6,
-      }).format(num);
-    }
-    
-    // Handle regular values
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(num);
-  } catch (_) {
-    return value;
-  }
-}
-
-function getChangeClass(change) {
-  if (typeof change !== 'number') return 'text-color-primary'
-  if (change > 0) return 'text-color-green'
-  if (change < 0) return 'text-color-red'
-  return 'text-color-primary'
 }
 
 /**
@@ -78,7 +25,7 @@ function getChangeClass(change) {
  * - interval: string - Candle interval ('1m', '5m', '1h', etc.)
  * - height: number - Chart height in pixels
  */
-export default function BinanceCandleChartCard({
+function BinanceCandleChartCard({
   name = 'Bitcoin',
   symbol = 'BTC',
   price = 86716,
@@ -92,7 +39,7 @@ export default function BinanceCandleChartCard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notOnBinance, setNotOnBinance] = useState(false);
-  const displayPrice = typeof price === 'number' ? formatCurrency(price) : (price || '$86,716')
+  const displayPrice = typeof price === 'number' ? formatPrice(price) : (price || '$86,716')
   const changeNumber = typeof change === 'string' ? parseFloat(change) : change
   const changeClass = getChangeClass(changeNumber)
   const changeText = change == null ? null : (typeof change === 'number' ? `${change > 0 ? '+' : ''}${change}%` : String(change))
@@ -140,12 +87,29 @@ export default function BinanceCandleChartCard({
   useEffect(() => {
     setNotOnBinance(false);
     setError(null);
+    
+    // Cleanup any existing instance first
+    if (instanceRef.current) {
+      try { instanceRef.current.destroy(); } catch (e) { /* cleanup error */ }
+      instanceRef.current = null;
+    }
+    
+    // Clear the container to prevent duplicate charts
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+    }
+    
     if (!containerRef.current) {
       setTimeout(() => setContainerReady(r => !r), 0);
       return;
     }
+    
+    let cancelled = false;
+    
     // Check if symbol is supported on Binance before initializing chart
     isBinanceSymbolSupported(chartSymbol || `${symbol}USDT`).then((supported) => {
+      if (cancelled) return;
+      
       if (!supported) {
         setNotOnBinance(true);
         return;
@@ -157,18 +121,21 @@ export default function BinanceCandleChartCard({
           height,
           data,
         };
-        console.log('[BinanceCandleChartCard] Initializing chart with config:', cfg);
         const instance = initBinanceCandleChart(containerRef.current, priceRef.current, cfg);
         instanceRef.current = instance;
-        return () => {
-          try { instanceRef.current?.destroy(); } catch (e) { console.warn('[BinanceCandleChartCard] destroy error', e); }
-          instanceRef.current = null;
-        };
       } catch (err) {
         setError('Failed to load chart data. Please try again.');
-        console.error('[BinanceCandleChartCard] Chart init error:', err);
       }
     });
+    
+    // Cleanup function
+    return () => {
+      cancelled = true;
+      if (instanceRef.current) {
+        try { instanceRef.current.destroy(); } catch (e) { /* cleanup error */ }
+        instanceRef.current = null;
+      }
+    };
   }, [chartSymbol, symbol, interval, height, containerReady]);
   
   return (
@@ -201,3 +168,5 @@ export default function BinanceCandleChartCard({
     </div>
   );
 }
+
+export default memo(BinanceCandleChartCard);

@@ -61,8 +61,6 @@ const ArticleFormPage = () => {
   const [error, setError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
-
   useEffect(() => {
     if (isEditing) {
       fetchArticle();
@@ -74,20 +72,8 @@ const ArticleFormPage = () => {
       setFetching(true);
       setError(null);
 
-      const response = await fetch(`${API_URL}/api/admin/articles/${id}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch article');
-      }
-
-      const result = await response.json();
+      const { getArticle } = await import('../../services/adminApi');
+      const result = await getArticle(id);
       const article = result.data || result;
       
       setFormData({
@@ -131,23 +117,12 @@ const ArticleFormPage = () => {
         ...(isEditing && changeMessage.trim() && { changeMessage: changeMessage.trim() })
       };
 
-      const url = isEditing 
-        ? `${API_URL}/api/admin/articles/${id}`
-        : `${API_URL}/api/admin/articles`;
-
-      const response = await fetch(url, {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Email': member?.auth?.email || '',
-          'X-Admin-Id': member?.id || ''
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save article');
+      const { createArticle, updateArticle } = await import('../../services/adminApi');
+      
+      if (isEditing) {
+        await updateArticle(id, payload);
+      } else {
+        await createArticle(payload);
       }
 
       setSaveSuccess(true);

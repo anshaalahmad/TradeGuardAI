@@ -4,7 +4,8 @@
  */
 
 import express from 'express';
-import * as resourcesService from '../services/resourcesService.js';
+import * as resourcesService from '../services/resourcesService.mjs';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -231,25 +232,18 @@ router.get('/search', asyncHandler(async (req, res) => {
 }));
 
 // ============================================
-// BOOKMARKS ROUTES
+// BOOKMARKS ROUTES (Protected - require authentication)
 // ============================================
 
 /**
- * GET /api/resources/bookmarks/:memberstackId
- * Get user's bookmarks
+ * GET /api/resources/bookmarks
+ * Get authenticated user's bookmarks
  */
-router.get('/bookmarks/:memberstackId', asyncHandler(async (req, res) => {
-  const { memberstackId } = req.params;
+router.get('/bookmarks', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
   const { resourceType, page = 1, limit = 20 } = req.query;
 
-  if (!memberstackId) {
-    return res.status(400).json({
-      success: false,
-      error: 'Member ID is required'
-    });
-  }
-
-  const result = await resourcesService.getUserBookmarks(memberstackId, {
+  const result = await resourcesService.getUserBookmarks(userId, {
     resourceType: resourceType?.toUpperCase(),
     page: parseInt(page),
     limit: parseInt(limit)
@@ -263,20 +257,13 @@ router.get('/bookmarks/:memberstackId', asyncHandler(async (req, res) => {
 }));
 
 /**
- * GET /api/resources/bookmarks/:memberstackId/ids
- * Get user's bookmark IDs for quick checks
+ * GET /api/resources/bookmarks/ids
+ * Get authenticated user's bookmark IDs for quick checks
  */
-router.get('/bookmarks/:memberstackId/ids', asyncHandler(async (req, res) => {
-  const { memberstackId } = req.params;
+router.get('/bookmarks/ids', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
 
-  if (!memberstackId) {
-    return res.status(400).json({
-      success: false,
-      error: 'Member ID is required'
-    });
-  }
-
-  const bookmarkIds = await resourcesService.getUserBookmarkIds(memberstackId);
+  const bookmarkIds = await resourcesService.getUserBookmarkIds(userId);
 
   res.json({
     success: true,
@@ -286,15 +273,16 @@ router.get('/bookmarks/:memberstackId/ids', asyncHandler(async (req, res) => {
 
 /**
  * POST /api/resources/bookmarks
- * Add a bookmark
+ * Add a bookmark for authenticated user
  */
-router.post('/bookmarks', asyncHandler(async (req, res) => {
-  const { memberstackId, resourceType, resourceId } = req.body;
+router.post('/bookmarks', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+  const { resourceType, resourceId } = req.body;
 
-  if (!memberstackId || !resourceType || !resourceId) {
+  if (!resourceType || !resourceId) {
     return res.status(400).json({
       success: false,
-      error: 'Missing required fields: memberstackId, resourceType, resourceId'
+      error: 'Missing required fields: resourceType, resourceId'
     });
   }
 
@@ -308,7 +296,7 @@ router.post('/bookmarks', asyncHandler(async (req, res) => {
 
   try {
     const bookmark = await resourcesService.addBookmark(
-      memberstackId,
+      userId,
       resourceType.toUpperCase(),
       resourceId
     );
@@ -337,20 +325,21 @@ router.post('/bookmarks', asyncHandler(async (req, res) => {
 
 /**
  * DELETE /api/resources/bookmarks
- * Remove a bookmark
+ * Remove a bookmark for authenticated user
  */
-router.delete('/bookmarks', asyncHandler(async (req, res) => {
-  const { memberstackId, resourceType, resourceId } = req.body;
+router.delete('/bookmarks', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+  const { resourceType, resourceId } = req.body;
 
-  if (!memberstackId || !resourceType || !resourceId) {
+  if (!resourceType || !resourceId) {
     return res.status(400).json({
       success: false,
-      error: 'Missing required fields: memberstackId, resourceType, resourceId'
+      error: 'Missing required fields: resourceType, resourceId'
     });
   }
 
   const deleted = await resourcesService.removeBookmark(
-    memberstackId,
+    userId,
     resourceType.toUpperCase(),
     resourceId
   );
@@ -369,22 +358,22 @@ router.delete('/bookmarks', asyncHandler(async (req, res) => {
 }));
 
 /**
- * GET /api/resources/bookmarks/:memberstackId/check
- * Check if a resource is bookmarked
+ * GET /api/resources/bookmarks/check
+ * Check if a resource is bookmarked for authenticated user
  */
-router.get('/bookmarks/:memberstackId/check', asyncHandler(async (req, res) => {
-  const { memberstackId } = req.params;
+router.get('/bookmarks/check', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
   const { resourceType, resourceId } = req.query;
 
-  if (!memberstackId || !resourceType || !resourceId) {
+  if (!resourceType || !resourceId) {
     return res.status(400).json({
       success: false,
-      error: 'Missing required parameters'
+      error: 'Missing required parameters: resourceType, resourceId'
     });
   }
 
   const isBookmarked = await resourcesService.isBookmarked(
-    memberstackId,
+    userId,
     resourceType.toUpperCase(),
     resourceId
   );
@@ -404,17 +393,17 @@ router.get('/bookmarks/:memberstackId/check', asyncHandler(async (req, res) => {
  * Update reading progress for an article
  */
 router.post('/progress', asyncHandler(async (req, res) => {
-  const { memberstackId, articleId, progress, completed } = req.body;
+  const { userId, articleId, progress, completed } = req.body;
 
-  if (!memberstackId || !articleId || progress === undefined) {
+  if (!userId || !articleId || progress === undefined) {
     return res.status(400).json({
       success: false,
-      error: 'Missing required fields: memberstackId, articleId, progress'
+      error: 'Missing required fields: userId, articleId, progress'
     });
   }
 
   const result = await resourcesService.updateReadingProgress(
-    memberstackId,
+    userId,
     articleId,
     parseInt(progress),
     completed || false
@@ -427,15 +416,15 @@ router.post('/progress', asyncHandler(async (req, res) => {
 }));
 
 /**
- * GET /api/resources/progress/:memberstackId
+ * GET /api/resources/progress/:userId
  * Get user's reading progress
  */
-router.get('/progress/:memberstackId', asyncHandler(async (req, res) => {
-  const { memberstackId } = req.params;
+router.get('/progress/:userId', asyncHandler(async (req, res) => {
+  const { userId } = req.params;
   const { articleIds } = req.query;
 
   const ids = articleIds ? articleIds.split(',') : [];
-  const progress = await resourcesService.getUserReadingProgress(memberstackId, ids);
+  const progress = await resourcesService.getUserReadingProgress(userId, ids);
 
   res.json({
     success: true,

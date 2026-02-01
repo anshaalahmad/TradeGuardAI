@@ -1,7 +1,7 @@
 /**
  * Admin Service
  * Handles all admin operations including:
- * - Memberstack API integration for user management
+ * - User management via Prisma (replaces Memberstack)
  * - Article and Pattern CRUD (including drafts)
  * - Audit logging
  * - Dashboard statistics
@@ -10,10 +10,6 @@
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-
-// Memberstack Admin API configuration
-const MEMBERSTACK_API_URL = 'https://admin.memberstack.com/members';
-const MEMBERSTACK_SECRET_KEY = process.env.MEMBERSTACK_SECRET_KEY;
 
 // ============================================
 // AUDIT LOGGING
@@ -34,22 +30,30 @@ export async function logAdminAction({
   userAgent = null
 }) {
   try {
+    // Validate adminId is a valid ObjectId format (24 hex characters)
+    // If not valid, use a placeholder ObjectId
+    const validAdminId = adminId && /^[0-9a-fA-F]{24}$/.test(adminId) 
+      ? adminId 
+      : '000000000000000000000000'; // Placeholder for unknown admin
+
     const log = await prisma.adminAuditLog.create({
       data: {
-        adminEmail,
-        adminId: adminId || 'unknown',
+        adminEmail: adminEmail || 'unknown@admin.com',
+        adminId: validAdminId,
         action,
         targetType,
-        targetId,
-        targetName,
+        targetId: targetId || 'unknown',
+        targetName: targetName || 'Unknown',
         changes,
         ipAddress,
         userAgent
       }
     });
+    console.log(`Audit log created: ${action} ${targetType} ${targetName}`);
     return log;
   } catch (error) {
     console.error('Error logging admin action:', error);
+    console.error('Audit data:', { adminEmail, adminId, action, targetType, targetId, targetName });
     // Don't throw - logging should not break main operations
     return null;
   }
@@ -109,129 +113,274 @@ export async function getAuditLogs({
 }
 
 // ============================================
-// MEMBERSTACK USER MANAGEMENT
+// USER MANAGEMENT (Prisma - replaces Memberstack)
 // ============================================
 
 /**
- * Fetch all members from Memberstack
+ * List all users with pagination and search
  */
 export async function listMembers({
   page = 1,
   limit = 20,
-  search = null
+  search = null,
+  plan = null
 } = {}) {
   try {
-    if (!MEMBERSTACK_SECRET_KEY || MEMBERSTACK_SECRET_KEY === 'your_memberstack_secret_key_here') {
-      // Return mock data if no secret key configured
-      return {
-        members: [],
-        pagination: { page, limit, total: 0, totalPages: 0 },
-        warning: 'Memberstack secret key not configured'
-      };
-    }
-
-    const offset = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     
-    const response = await fetch(
-      `${MEMBERSTACK_API_URL}?limit=${limit}&offset=${offset}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
-      {
-        headers: {
-          'X-API-KEY': MEMBERSTACK_SECRET_KEY,
-          'Content-Type': 'application/json'
+    const where = {
+      ...(search ? {
+        OR: [
+          { email: { contains: search, mode: 'insensitive' } },
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } }
+        ]
+      } : {}),
+      ...(plan && plan !== 'all' ? {
+        subscription: {
+          planTier: plan
         }
+      } : {})
+    };
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          emailVerified: true,
+          googleId: true,
+          createdAt: true,
+          lastLogin: true,
+          subscription: {
+            select: {
+              id: true,
+              planTier: true,
+              status: true,
+              stripeSubscriptionId: true,
+              stripeCustomerId: true,
+              currentPeriodEnd: true,
+              cancelAtPeriodEnd: true
+            }
+          }
+        }
+      }),
+      prisma.user.count({ where })
+    ]);
+
+    // Map to member format for backwards compatibility
+    const members = users.map(user => ({
+      id: user.id,
+      auth: {
+        email: user.email
+      },
+      customFields: {
+        'first-name': user.firstName || '',
+        firstName: user.firstName || '',
+        'last-name': user.lastName || '',
+        lastName: user.lastName || ''
+      },
+      role: user.role,
+      verified: user.emailVerified,
+      emailVerified: user.emailVerified,
+      hasGoogleLinked: !!user.googleId,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      subscription: user.subscription ? {
+        id: user.subscription.id,
+        planTier: user.subscription.planTier,
+        status: user.subscription.status,
+        stripeSubscriptionId: user.subscription.stripeSubscriptionId,
+        stripeCustomerId: user.subscription.stripeCustomerId,
+        currentPeriodEnd: user.subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd
+      } : {
+        planTier: 'FREE',
+        status: 'ACTIVE'
       }
-    );
+    }));
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Memberstack API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
     return {
-      members: data.data || [],
+      members,
       pagination: {
         page,
         limit,
-        total: data.totalCount || 0,
-        totalPages: Math.ceil((data.totalCount || 0) / limit)
+        total,
+        totalPages: Math.ceil(total / limit)
       }
     };
   } catch (error) {
-    console.error('Error listing members:', error);
-    throw new Error('Failed to fetch members from Memberstack');
+    console.error('Error listing users:', error);
+    throw new Error('Failed to fetch users');
   }
 }
 
 /**
- * Get a single member by ID
+ * Get a single user by ID
  */
-export async function getMember(memberId) {
+export async function getMember(userId) {
   try {
-    if (!MEMBERSTACK_SECRET_KEY || MEMBERSTACK_SECRET_KEY === 'your_memberstack_secret_key_here') {
-      throw new Error('Memberstack secret key not configured');
-    }
-
-    const response = await fetch(
-      `${MEMBERSTACK_API_URL}/${memberId}`,
-      {
-        headers: {
-          'X-API-KEY': MEMBERSTACK_SECRET_KEY,
-          'Content-Type': 'application/json'
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        emailVerified: true,
+        googleId: true,
+        createdAt: true,
+        lastLogin: true,
+        subscription: {
+          select: {
+            id: true,
+            planTier: true,
+            status: true,
+            stripeSubscriptionId: true,
+            stripeCustomerId: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true
+          }
         }
       }
-    );
+    });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
+    if (!user) return null;
+
+    // Map to member format for backwards compatibility
+    return {
+      id: user.id,
+      auth: {
+        email: user.email
+      },
+      customFields: {
+        'first-name': user.firstName || '',
+        firstName: user.firstName || '',
+        'last-name': user.lastName || '',
+        lastName: user.lastName || ''
+      },
+      role: user.role,
+      verified: user.emailVerified,
+      emailVerified: user.emailVerified,
+      hasGoogleLinked: !!user.googleId,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      subscription: user.subscription ? {
+        id: user.subscription.id,
+        planTier: user.subscription.planTier,
+        status: user.subscription.status,
+        stripeSubscriptionId: user.subscription.stripeSubscriptionId,
+        stripeCustomerId: user.subscription.stripeCustomerId,
+        currentPeriodEnd: user.subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd
+      } : {
+        planTier: 'FREE',
+        status: 'ACTIVE'
       }
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Memberstack API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.data || data;
+    };
   } catch (error) {
-    console.error('Error fetching member:', error);
+    console.error('Error fetching user:', error);
     throw error;
   }
 }
 
 /**
- * Update a member's data
+ * Update a user's data
  */
-export async function updateMember(memberId, updates, adminInfo) {
+export async function updateMember(userId, updates, adminInfo) {
   try {
-    if (!MEMBERSTACK_SECRET_KEY || MEMBERSTACK_SECRET_KEY === 'your_memberstack_secret_key_here') {
-      throw new Error('Memberstack secret key not configured');
-    }
-
     // Get current data for audit log
-    const currentMember = await getMember(memberId);
-    if (!currentMember) {
-      throw new Error('Member not found');
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true }
+    });
+    
+    if (!currentUser) {
+      throw new Error('User not found');
     }
 
-    const response = await fetch(
-      `${MEMBERSTACK_API_URL}/${memberId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'X-API-KEY': MEMBERSTACK_SECRET_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updates)
+    // Map incoming updates to prisma fields
+    const prismaUpdates = {};
+    if (updates.customFields?.['first-name'] !== undefined) {
+      prismaUpdates.firstName = updates.customFields['first-name'];
+    }
+    if (updates.firstName !== undefined) {
+      prismaUpdates.firstName = updates.firstName;
+    }
+    if (updates.lastName !== undefined) {
+      prismaUpdates.lastName = updates.lastName;
+    }
+    if (updates.role !== undefined) {
+      prismaUpdates.role = updates.role;
+    }
+    if (updates.emailVerified !== undefined) {
+      prismaUpdates.emailVerified = updates.emailVerified;
+    }
+    if (updates.verified !== undefined) {
+      prismaUpdates.emailVerified = updates.verified;
+    }
+
+    // Update user
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: prismaUpdates,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        emailVerified: true,
+        googleId: true,
+        createdAt: true,
+        lastLogin: true
       }
-    );
+    });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Memberstack API error: ${response.status}`);
+    // Handle plan tier update - Admin can grant any plan without payment
+    let updatedSubscription = currentUser.subscription;
+    if (updates.planTier !== undefined && updates.planTier !== currentUser.subscription?.planTier) {
+      const subscriptionData = {
+        planTier: updates.planTier,
+        status: 'ACTIVE', // Admin-granted plans are always active
+        // Clear Stripe data since this is an admin-granted subscription (no payment required)
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        currentPeriodStart: new Date(),
+        // Set far future expiration for admin-granted paid plans (10 years)
+        // For FREE tier, no expiration needed
+        currentPeriodEnd: updates.planTier === 'FREE' 
+          ? null 
+          : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+        cancelAtPeriodEnd: false
+      };
+
+      if (currentUser.subscription) {
+        // Update existing subscription
+        updatedSubscription = await prisma.subscription.update({
+          where: { userId: userId },
+          data: subscriptionData
+        });
+      } else {
+        // Create subscription if it doesn't exist
+        updatedSubscription = await prisma.subscription.create({
+          data: {
+            userId: userId,
+            ...subscriptionData
+          }
+        });
+      }
+
+      console.log(`Admin ${adminInfo.email} granted ${updates.planTier} plan to user ${currentUser.email}`);
     }
-
-    const updatedMember = await response.json();
 
     // Log the action
     await logAdminAction({
@@ -239,53 +388,67 @@ export async function updateMember(memberId, updates, adminInfo) {
       adminId: adminInfo.id,
       action: 'UPDATE',
       targetType: 'USER',
-      targetId: memberId,
-      targetName: currentMember.auth?.email || memberId,
+      targetId: userId,
+      targetName: currentUser.email,
       changes: {
-        before: currentMember,
-        after: updatedMember.data || updatedMember
+        before: { ...currentUser, subscription: currentUser.subscription },
+        after: { ...updatedUser, subscription: updatedSubscription },
+        planChanged: updates.planTier !== undefined && updates.planTier !== currentUser.subscription?.planTier
       },
       ipAddress: adminInfo.ipAddress,
       userAgent: adminInfo.userAgent
     });
 
-    return updatedMember.data || updatedMember;
+    // Map to member format
+    return {
+      id: updatedUser.id,
+      auth: {
+        email: updatedUser.email
+      },
+      customFields: {
+        'first-name': updatedUser.firstName || '',
+        firstName: updatedUser.firstName || '',
+        lastName: updatedUser.lastName || ''
+      },
+      role: updatedUser.role,
+      verified: updatedUser.emailVerified,
+      emailVerified: updatedUser.emailVerified,
+      hasGoogleLinked: !!updatedUser.googleId,
+      createdAt: updatedUser.createdAt,
+      lastLogin: updatedUser.lastLogin,
+      subscription: updatedSubscription ? {
+        id: updatedSubscription.id,
+        planTier: updatedSubscription.planTier,
+        status: updatedSubscription.status,
+        stripeSubscriptionId: updatedSubscription.stripeSubscriptionId,
+        currentPeriodEnd: updatedSubscription.currentPeriodEnd,
+        cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd
+      } : { planTier: 'FREE', status: 'ACTIVE' }
+    };
   } catch (error) {
-    console.error('Error updating member:', error);
+    console.error('Error updating user:', error);
     throw error;
   }
 }
 
 /**
- * Delete a member
+ * Delete a user
  */
-export async function deleteMember(memberId, adminInfo) {
+export async function deleteMember(userId, adminInfo) {
   try {
-    if (!MEMBERSTACK_SECRET_KEY || MEMBERSTACK_SECRET_KEY === 'your_memberstack_secret_key_here') {
-      throw new Error('Memberstack secret key not configured');
-    }
-
     // Get current data for audit log
-    const currentMember = await getMember(memberId);
-    if (!currentMember) {
-      throw new Error('Member not found');
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    
+    if (!currentUser) {
+      throw new Error('User not found');
     }
 
-    const response = await fetch(
-      `${MEMBERSTACK_API_URL}/${memberId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          'X-API-KEY': MEMBERSTACK_SECRET_KEY,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Memberstack API error: ${response.status}`);
-    }
+    // Delete user (cascades to related records)
+    await prisma.user.delete({
+      where: { id: userId }
+    });
 
     // Log the action
     await logAdminAction({
@@ -293,16 +456,16 @@ export async function deleteMember(memberId, adminInfo) {
       adminId: adminInfo.id,
       action: 'DELETE',
       targetType: 'USER',
-      targetId: memberId,
-      targetName: currentMember.auth?.email || memberId,
-      changes: { deleted: currentMember },
+      targetId: userId,
+      targetName: currentUser.email,
+      changes: { deleted: currentUser },
       ipAddress: adminInfo.ipAddress,
       userAgent: adminInfo.userAgent
     });
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting member:', error);
+    console.error('Error deleting user:', error);
     throw error;
   }
 }
@@ -832,18 +995,8 @@ export async function deletePattern(id, adminInfo) {
  */
 export async function getDashboardStats() {
   try {
-    // Get users count from Memberstack
-    let totalUsers = 0;
-    try {
-      if (MEMBERSTACK_SECRET_KEY && MEMBERSTACK_SECRET_KEY !== 'your_memberstack_secret_key_here') {
-        const membersResult = await listMembers({ page: 1, limit: 1 });
-        totalUsers = membersResult.pagination?.total || 0;
-      }
-    } catch (err) {
-      console.warn('Could not fetch users count:', err.message);
-    }
-
     const [
+      totalUsers,
       totalArticles,
       publishedArticles,
       draftArticles,
@@ -853,6 +1006,7 @@ export async function getDashboardStats() {
       articlesByCategory,
       patternsByType
     ] = await Promise.all([
+      prisma.user.count(),
       prisma.learningArticle.count(),
       prisma.learningArticle.count({ where: { published: true } }),
       prisma.learningArticle.count({ where: { published: false } }),
