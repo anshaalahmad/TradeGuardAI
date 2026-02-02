@@ -3,9 +3,10 @@ set -e
 
 echo "=== Before Install ==="
 
-# Clean up old deployment
+# Clean up old deployment (including hidden files)
 if [ -d /var/www/tradeguard ]; then
-    sudo rm -rf /var/www/tradeguard/*
+    echo "Cleaning up existing deployment..."
+    sudo rm -rf /var/www/tradeguard/* /var/www/tradeguard/.[!.]* /var/www/tradeguard/..?* 2>/dev/null || true
 fi
 
 # Create directories
