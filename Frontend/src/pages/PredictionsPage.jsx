@@ -5,7 +5,7 @@ import Navbar from '../Components/Dashboard Pages/Navbar';
 import Sidebar from '../Components/Dashboard Pages/Sidebar';
 
 // Prediction API URL
-const PREDICTION_API_URL = 'http://140.245.22.67:5000/api/prediction';
+const PREDICTION_API_URL = 'https://140.245.22.67:5000/api/prediction';
 
 // Coin prediction data
 const predictionCoins = [

@@ -34,6 +34,18 @@ server {
         root /var/www/tradeguard/Frontend/dist;
         index index.html;
         try_files $uri $uri/ /index.html;
+        
+        # Cache busting for static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1h;
+            add_header Cache-Control "public, must-revalidate";
+        }
+        
+        # Don't cache HTML
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+        }
     }
 
     # Backend API proxy

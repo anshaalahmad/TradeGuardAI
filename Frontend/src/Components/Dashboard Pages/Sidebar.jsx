@@ -193,7 +193,7 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
       id: 'predictions', 
       label: 'Predictions', 
       path: '/predictions',
-      planLabel: 'Pro Plan'
+      planLabel: 'Pro'
     },
     // API Dashboard - Shown to all users
     {
@@ -201,7 +201,7 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
       label: 'API Dashboard',
       path: '/api-dashboard',
       icon: CodeIcon,
-      planLabel: 'API Plan'
+      planLabel: 'API'
     },
     { 
       id: 'resources', 
