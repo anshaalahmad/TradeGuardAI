@@ -5,13 +5,12 @@ import Navbar from '../Components/Dashboard Pages/Navbar';
 import Sidebar from '../Components/Dashboard Pages/Sidebar';
 
 // Get API base URL
-const getApiUrl = () => {
+const getApiBaseUrl = () => {
   const viteUrl = import.meta.env.VITE_API_URL;
   return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
 };
 
-const API_BASE_URL = getApiUrl();
-const PREDICTION_API_URL = `${API_BASE_URL}/predictions`;
+const API_BASE_URL = getApiBaseUrl();
 
 // Coin prediction data
 const predictionCoins = [
@@ -71,7 +70,7 @@ export default function PredictionsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${PREDICTION_API_URL}/${selectedCoin.id}`);
+      const response = await fetch(`${API_BASE_URL}/api/predictions/${selectedCoin.id}`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch prediction data');
