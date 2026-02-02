@@ -122,13 +122,26 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 See `Backend/.env.example` for complete list with descriptions.
 
 ### Quick Copy Template (Development)
+
+**Note**: The command substitutions below (`$(...)`) need to be executed first to generate actual values. Run each command separately:
+
+```bash
+# Generate JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Generate JWT_REFRESH_SECRET  
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Then create your `.env` file with the generated values:
+
 ```env
 PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 DATABASE_URL="mongodb+srv://user:pass@cluster.mongodb.net/tradeguardai?retryWrites=true&w=majority"
-JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-JWT_REFRESH_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+JWT_SECRET=your-generated-secret-here
+JWT_REFRESH_SECRET=your-generated-refresh-secret-here
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 ```

@@ -203,6 +203,11 @@ After successful deployment, secure your site with HTTPS:
 
 ```bash
 cd /var/www/tradeguard/scripts
+
+# With email (recommended for security notifications)
+sudo ./setup_ssl.sh yourdomain.com admin@yourdomain.com
+
+# Without email (not recommended)
 sudo ./setup_ssl.sh yourdomain.com
 ```
 
@@ -212,7 +217,9 @@ This will:
 - Configure Nginx for HTTPS
 - Set up automatic certificate renewal
 
-**Note**: Ensure your domain DNS is pointing to your EC2 instance's public IP before running this command.
+**Note**: 
+- Ensure your domain DNS is pointing to your EC2 instance's public IP before running this command
+- Providing an email is recommended to receive certificate expiration and security notices.
 
 ## Step 7: Verify Deployment
 
@@ -366,13 +373,21 @@ pm2 restart tradeguard-api
 
 ## Cost Considerations
 
-### Mumbai Region (ap-south-1) Pricing (approximate)
+### Mumbai Region (ap-south-1) Pricing (Approximate - as of 2026)
+
+**Note**: Pricing is approximate and subject to change. Always verify current pricing at:
+- EC2: https://aws.amazon.com/ec2/pricing/
+- Data Transfer: https://aws.amazon.com/ec2/pricing/on-demand/#Data_Transfer
+
+Estimated costs:
 - **EC2 t2.medium**: ~$0.0464/hour (~$34/month)
 - **MongoDB Atlas M0**: Free tier (512MB storage)
 - **Data Transfer**: First 1GB free, then $0.09/GB
 - **CodeDeploy**: Free for EC2 deployments
 
 **Total estimated cost**: $35-50/month (depending on traffic)
+
+*Last updated: February 2026*
 
 ## Support
 

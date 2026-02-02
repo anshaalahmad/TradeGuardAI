@@ -4,15 +4,21 @@ set -e
 echo "=== SSL Certificate Setup ==="
 
 # This script should be run manually after deployment with your domain name
-# Usage: sudo ./setup_ssl.sh yourdomain.com
+# Usage: sudo ./setup_ssl.sh yourdomain.com [email]
 
 if [ -z "$1" ]; then
-    echo "Usage: sudo ./setup_ssl.sh yourdomain.com"
-    echo "Example: sudo ./setup_ssl.sh tradeguardai.com"
+    echo "Usage: sudo ./setup_ssl.sh yourdomain.com [email]"
+    echo "Example: sudo ./setup_ssl.sh tradeguardai.com admin@tradeguardai.com"
+    echo ""
+    echo "Email is optional but recommended for:"
+    echo "  - Certificate expiration notices"
+    echo "  - Security notifications from Let's Encrypt"
+    echo "  - Account recovery"
     exit 1
 fi
 
 DOMAIN=$1
+EMAIL=$2
 
 echo "Setting up SSL certificate for $DOMAIN..."
 
@@ -59,7 +65,13 @@ sudo systemctl reload nginx
 
 # Obtain SSL certificate
 echo "Obtaining SSL certificate from Let's Encrypt..."
-sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --register-unsafely-without-email
+if [ -z "$EMAIL" ]; then
+    echo "Note: No email provided - using --register-unsafely-without-email"
+    echo "Consider providing an email to receive important security notifications"
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --register-unsafely-without-email
+else
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --email $EMAIL
+fi
 
 # Setup auto-renewal
 echo "Setting up automatic renewal..."
