@@ -20,6 +20,8 @@ npx prisma generate
 # Copy environment file if exists in secure location
 if [ -f /home/ubuntu/.env.backend ]; then
     cp /home/ubuntu/.env.backend /var/www/tradeguard/Backend/.env
+    chown ubuntu:ubuntu /var/www/tradeguard/Backend/.env
+    chmod 600 /var/www/tradeguard/Backend/.env
     echo "Environment file copied."
 else
     echo "WARNING: No .env.backend file found at /home/ubuntu/.env.backend"

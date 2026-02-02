@@ -3,18 +3,22 @@ set -e
 
 echo "=== Application Start ==="
 
-# Start Backend with PM2
+# Ensure port 5000 is completely free
+sudo fuser -k 5000/tcp 2>/dev/null || true
+sleep 2
+
+# Start Backend with PM2 as ubuntu user
 cd /var/www/tradeguard/Backend
 
-# Stop existing process if running
-pm2 delete tradeguard-api 2>/dev/null || true
+# Delete any existing PM2 process
+sudo -u ubuntu pm2 delete tradeguard-api 2>/dev/null || true
 
-# Start with .env file (PM2 loads it automatically)
-pm2 start src/server.js --name tradeguard-api
-pm2 save
+# Start with PM2 as ubuntu user
+sudo -u ubuntu pm2 start src/server.js --name tradeguard-api
+sudo -u ubuntu pm2 save
 
-# Setup PM2 to start on boot (run once)
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu 2>/dev/null || true
+# Setup PM2 to start on boot (idempotent)
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu 2>/dev/null || true
 
 # Configure Nginx to serve Frontend
 sudo tee /etc/nginx/sites-available/tradeguard > /dev/null <<EOF
