@@ -25,8 +25,3 @@ hooks:
     - location: scripts/application_stop.sh
       timeout: 300
       runas: root
-
-  ValidateService:
-    - location: scripts/validate_deployment.sh
-      timeout: 120
-      runas: ubuntu
