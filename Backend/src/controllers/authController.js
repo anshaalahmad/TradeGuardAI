@@ -312,6 +312,10 @@ const verifyRegistration = async (req, res) => {
         googleId: user.googleId,
         hasPassword: !!user.passwordHash,
         hasGoogleLinked: !!user.googleId,
+        subscription: {
+          planTier: 'FREE',
+          status: 'ACTIVE',
+        },
       },
       accessToken,
       refreshToken,
@@ -416,9 +420,12 @@ const login = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Find user
+    // Find user with subscription
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
+      include: {
+        subscription: true,
+      },
     });
 
     if (!user) {
@@ -473,6 +480,19 @@ const login = async (req, res) => {
       },
     });
 
+    // Format subscription for response
+    const subscription = user.subscription
+      ? {
+          planTier: user.subscription.planTier,
+          status: user.subscription.status,
+          currentPeriodEnd: user.subscription.currentPeriodEnd,
+          cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd,
+        }
+      : {
+          planTier: 'FREE',
+          status: 'ACTIVE',
+        };
+
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -486,6 +506,7 @@ const login = async (req, res) => {
         googleId: user.googleId,
         hasPassword: !!user.passwordHash,
         hasGoogleLinked: !!user.googleId,
+        subscription,
       },
       accessToken,
       refreshToken,

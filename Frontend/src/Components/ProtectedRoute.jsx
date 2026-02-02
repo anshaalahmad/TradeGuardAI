@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
  * @param {string} props.requiredPlan - Legacy prop, now uses requiredTier
  */
 const ProtectedRoute = ({ children, requiredTier = null, requiredPlan = null }) => {
-  const { loading, isAuthenticated, hasTier, subscription } = useAuth();
+  const { loading, isAuthenticated, hasTier, subscription, user } = useAuth();
   const location = useLocation();
 
   // Use requiredTier or fall back to requiredPlan for backward compatibility
@@ -52,6 +52,40 @@ const ProtectedRoute = ({ children, requiredTier = null, requiredPlan = null }) 
   // Redirect to login page if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Wait for user data to be fully loaded before checking tier
+  // This prevents false redirects when subscription data hasn't loaded yet
+  if (tierToCheck && user && !user.subscription) {
+    // User exists but subscription not loaded yet - show loading
+    return (
+      <div className="main-wrapper" style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        backgroundColor: 'var(--background-grey, #fafbfc)'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="loading-spinner" style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid var(--border-color--border-primary, #e5e5e7)',
+            borderTop: '3px solid var(--base-color-brand--color-primary, #1e65fa)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem',
+          }} />
+          <div className="text-size-medium text-color-secondary">Verifying access...</div>
+        </div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
   }
 
   // Check subscription tier if required
