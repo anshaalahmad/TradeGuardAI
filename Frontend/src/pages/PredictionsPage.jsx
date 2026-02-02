@@ -4,8 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../Components/Dashboard Pages/Navbar';
 import Sidebar from '../Components/Dashboard Pages/Sidebar';
 
-// Prediction API URL - proxied through AWS backend
-const PREDICTION_API_URL = '/api/predictions';
+// Get API base URL
+const getApiUrl = () => {
+  const viteUrl = import.meta.env.VITE_API_URL;
+  return viteUrl === 'RUNTIME_ORIGIN' ? '' : viteUrl || 'http://localhost:5000';
+};
+
+const API_BASE_URL = getApiUrl();
+const PREDICTION_API_URL = `${API_BASE_URL}/predictions`;
 
 // Coin prediction data
 const predictionCoins = [
