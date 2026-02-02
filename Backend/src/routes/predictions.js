@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
-// Oracle prediction API endpoint
+// Oracle prediction API endpoint (only Bitcoin supported currently)
 const ORACLE_PREDICTION_API = 'http://140.245.22.67:5000/api/prediction';
 
 /**
@@ -14,22 +14,22 @@ router.get('/:coinId', async (req, res) => {
   try {
     const { coinId } = req.params;
     
-    // Validate coinId
-    if (!coinId || typeof coinId !== 'string') {
-      return res.status(400).json({ error: 'Invalid coin ID' });
+    // Validate coinId - only bitcoin supported for now
+    if (!coinId || coinId !== 'bitcoin') {
+      return res.status(400).json({ error: 'Only Bitcoin predictions are currently available' });
     }
     
-    console.log(`[Predictions Proxy] Fetching prediction for ${coinId} from Oracle API...`);
+    console.log(`[Predictions Proxy] Fetching prediction from Oracle API...`);
     
-    // Forward request to Oracle instance
-    const response = await axios.get(`${ORACLE_PREDICTION_API}/${coinId}`, {
-      timeout: 10000, // 10 second timeout
+    // Forward request to Oracle instance - endpoint doesn't need coinId
+    const response = await axios.get(ORACLE_PREDICTION_API, {
+      timeout: 15000, // 15 second timeout
       headers: {
         'Accept': 'application/json',
       },
     });
     
-    console.log(`[Predictions Proxy] Successfully fetched prediction for ${coinId}`);
+    console.log(`[Predictions Proxy] Successfully fetched prediction`);
     
     // Return Oracle's response
     res.json(response.data);
