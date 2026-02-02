@@ -106,6 +106,28 @@ app.use('/api/market', marketRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/predictions', predictionsRoutes);
 
+// Logo proxy route - fetches crypto logos from Logo.dev
+app.get('/api/logo/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol.toLowerCase();
+    const logoDevUrl = `https://img.logo.dev/ticker/${symbol}?token=${process.env.LOGO_DEV_API_KEY || 'pk_NPEGddObTf6Youc6KFKT6w'}`;
+    
+    const response = await fetch(logoDevUrl);
+    if (!response.ok) {
+      // Return a placeholder if logo not found
+      return res.redirect(`https://ui-avatars.com/api/?name=${symbol.toUpperCase()}&background=1e65fa&color=fff&size=128`);
+    }
+    
+    // Forward the image
+    res.set('Content-Type', response.headers.get('Content-Type'));
+    res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    response.body.pipe(res);
+  } catch (error) {
+    console.error('Logo proxy error:', error);
+    res.redirect(`https://ui-avatars.com/api/?name=${req.params.symbol.toUpperCase()}&background=1e65fa&color=fff&size=128`);
+  }
+});
+
 // Resources routes (loaded dynamically as ES Module)
 app.use('/api/resources', (req, res, next) => {
   if (resourcesRoutes) {

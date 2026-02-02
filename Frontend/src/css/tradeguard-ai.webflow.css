@@ -12660,3 +12660,58 @@ figcaption {
     flex-direction: column;
   }
 }
+
+/* =====================================================
+   CHART HEADER RESPONSIVE FIXES
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .card_app_header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: auto;
+  }
+  
+  .card_app_header .card_main_text_wrapper {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .card_app_price {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card_app_header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .card_app_price {
+    font-size: 1.5rem;
+  }
+  
+  .card_main_crypto_icon {
+    max-width: 1.25rem;
+  }
+}
+
+/* Dashboard Main Flex Responsive */
+@media (max-width: 992px) {
+  .dashboard_main_flex {
+    flex-direction: column;
+  }
+  
+  .market-summary_main_wrapper {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Content Main Flex (Order Book + Market Trades) */
+@media (max-width: 768px) {
+  .content_main_flex {
+    flex-direction: column;
+  }
+}

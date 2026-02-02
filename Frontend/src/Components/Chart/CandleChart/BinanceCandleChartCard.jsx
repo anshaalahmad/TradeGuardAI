@@ -5,8 +5,8 @@ import { formatPrice, getChangeClass } from '../../../utils/formatters';
 
 function getCryptoLogoUrl(symbol) {
   const sym = String(symbol || '').toLowerCase()
-  // Use proxied endpoint to hide API key
-  return `/api/logo/${sym}`
+  // Use Logo.dev directly with public key (or fallback to UI Avatars)
+  return `https://img.logo.dev/ticker/${sym}?token=pk_NPEGddObTf6Youc6KFKT6w&fallback=https://ui-avatars.com/api/?name=${sym.toUpperCase()}&background=1e65fa&color=fff`
 }
 
 /**
@@ -140,18 +140,23 @@ function BinanceCandleChartCard({
   
   return (
     <div className="card_app_wrapper">
-      <div className="card_app_header">
-        <div className="card_main_text_wrapper is-centered">
+      <div className="card_app_header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div className="card_main_text_wrapper is-centered" style={{ flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
           <img
             src={logoUrl}
             loading="lazy"
             alt={`${name} logo`}
             className="card_main_crypto_icon"
+            style={{ flexShrink: 0 }}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = `https://ui-avatars.com/api/?name=${symbol}&background=1e65fa&color=fff&size=48`;
+            }}
           />
-          <div className="text-size-large text-weight-medium">{name}</div>
+          <div className="text-size-large text-weight-medium" style={{ wordBreak: 'break-word' }}>{name}</div>
           <div className="text-size-large text-color-secondary">{symbol}</div>
         </div>
-        <div className="card_main_text_wrapper is-centered">
+        <div className="card_main_text_wrapper is-centered" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
           <div ref={priceRef} className="card_app_price" style={{ color: 'black' }}>{displayPrice}</div>
           {changeText ? (
             <div className={`text-size-regular ${changeClass}`}>{changeText}</div>

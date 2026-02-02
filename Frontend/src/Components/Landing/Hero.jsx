@@ -30,14 +30,13 @@ const Hero = () => {
                   </Link>
                 </div>
               </div>
-              <div className="hero_main_image_wrapper">
+              <div className="hero_main_image_wrapper" style={{ overflow: 'hidden', borderRadius: '12px', maxWidth: '100%' }}>
                 <img
                   src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/69804758ea94642ffa6ead06_Screenshot%202026-02-01%20234054.png"
                   loading="lazy"
-                  sizes="(max-width: 479px) 100vw, 239.97222900390625px"
-                  srcSet="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/69804758ea94642ffa6ead06_Screenshot%202026-02-01%20234054.png"
                   alt="Dashboard Preview"
                   className="hero_main_image"
+                  style={{ width: '100%', height: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
                 />
               </div>
             </div>
