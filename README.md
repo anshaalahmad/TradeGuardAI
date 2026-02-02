@@ -30,6 +30,7 @@
   <a href="#-environment-setup">Environment</a> •
   <a href="#-project-structure">Structure</a> •
   <a href="#-api-documentation">API Docs</a> •
+  <a href="#-deployment">Deployment</a> •
   <a href="#-contributing">Contributing</a>
 </p>
 
@@ -475,6 +476,41 @@ curl -X GET "http://localhost:5000/api/crypto/BTC/history?interval=1h&limit=100"
 - **Helmet** - Security headers
 - **CORS** - Cross-origin configuration
 - **Morgan** - HTTP request logging
+
+---
+
+## 🚀 Deployment
+
+### Production Deployment with AWS
+
+TradeGuardAI supports automated deployment to AWS EC2 using CodeDeploy, specifically configured for the Mumbai (ap-south-1) region to ensure Binance API compatibility.
+
+#### Quick Deployment Guide
+
+1. **Launch EC2 Instance** (Ubuntu 22.04) in Mumbai region
+2. **Install dependencies** on the server:
+   ```bash
+   wget https://raw.githubusercontent.com/anshaalahmad/TradeGuardAI/main/scripts/install_dependencies.sh
+   chmod +x install_dependencies.sh
+   sudo ./install_dependencies.sh
+   ```
+3. **Configure environment** variables at `/home/ubuntu/.env.backend`
+4. **Set up CodeDeploy** application and deployment group
+5. **Deploy** via AWS CodeDeploy console or CLI
+6. **Secure with SSL**:
+   ```bash
+   sudo /var/www/tradeguard/scripts/setup_ssl.sh yourdomain.com
+   ```
+
+#### Deployment Features
+- ✅ Automated deployment with AWS CodeDeploy
+- ✅ Zero-downtime updates with PM2
+- ✅ Nginx reverse proxy configuration
+- ✅ Automatic SSL/HTTPS setup with Let's Encrypt
+- ✅ Health checks and deployment validation
+- ✅ Production-ready security configuration
+
+📖 **[Full Deployment Guide](DEPLOYMENT.md)** - Complete step-by-step instructions for AWS deployment
 
 ---
 

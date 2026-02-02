@@ -373,7 +373,7 @@ const ChangesDiff = ({ changes, action, targetType }) => {
   return <span className="admin-no-changes">No changes recorded</span>;
 };
 
-// Log Row Component
+// Log Row Component (Desktop Table)
 const LogRow = ({ log }) => {
   const [expanded, setExpanded] = useState(false);
   // Allow expansion for all actions that have changes
@@ -442,6 +442,76 @@ const LogRow = ({ log }) => {
         </tr>
       )}
     </>
+  );
+};
+
+// Log Card Component (Mobile)
+const LogCard = ({ log }) => {
+  const [expanded, setExpanded] = useState(false);
+  const canExpand = log.changes && (
+    log.changes.message || 
+    log.changes.before || 
+    log.changes.after || 
+    log.changes.created || 
+    log.changes.deleted
+  );
+
+  return (
+    <div className={`admin-log-card ${expanded ? 'admin-log-card--expanded' : ''}`}>
+      <div 
+        className="admin-log-card-header"
+        onClick={() => canExpand && setExpanded(!expanded)}
+      >
+        <div className="admin-log-card-top">
+          <span 
+            className="admin-action-badge"
+            style={{ 
+              background: getActionBg(log.action),
+              color: getActionColor(log.action)
+            }}
+          >
+            {log.action}
+          </span>
+          <span className="admin-log-card-time">
+            {formatDateTime(log.createdAt)}
+          </span>
+        </div>
+        
+        <div className="admin-log-card-target">
+          <div className="admin-log-card-target-icon">
+            {getTargetIcon(log.targetType)}
+          </div>
+          <div className="admin-log-card-target-info">
+            <span className="admin-log-card-target-type">{log.targetType}</span>
+            <span className="admin-log-card-target-name">{log.targetName}</span>
+          </div>
+        </div>
+
+        <div className="admin-log-card-admin">
+          <UserIcon />
+          <span>{log.adminEmail}</span>
+        </div>
+
+        {canExpand && (
+          <button className="admin-log-card-expand" aria-label="Expand">
+            {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+          </button>
+        )}
+      </div>
+
+      {canExpand && expanded && (
+        <div className="admin-log-card-details">
+          <div className="admin-log-card-details-header">
+            <h4>
+              {log.action === 'CREATE' ? 'Created Data' : 
+               log.action === 'DELETE' ? 'Deleted Data' : 
+               'Change Details'}
+            </h4>
+          </div>
+          <ChangesDiff changes={log.changes} action={log.action} targetType={log.targetType} />
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -581,7 +651,8 @@ const AuditLogsPage = () => {
           {/* Logs Table */}
           {!loading && !error && (
             <>
-              <div className="admin-table-container card_app_wrapper">
+              {/* Desktop Table View */}
+              <div className="admin-table-container admin-logs-desktop card_app_wrapper">
                 <table className="admin-table admin-logs-table">
                   <thead>
                     <tr>
@@ -609,6 +680,24 @@ const AuditLogsPage = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="admin-logs-mobile">
+                {logs.length > 0 ? (
+                  logs.map(log => (
+                    <LogCard key={log.id} log={log} />
+                  ))
+                ) : (
+                  <div className="admin-logs-empty-card card_app_wrapper">
+                    <p>
+                      {searchQuery || actionFilter !== 'all' || targetFilter !== 'all'
+                        ? 'No logs match your filters'
+                        : 'No audit logs yet'
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Pagination */}
