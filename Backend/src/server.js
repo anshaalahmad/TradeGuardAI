@@ -17,6 +17,7 @@ const marketRoutes = require('./routes/market');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const subscriptionRoutes = require('./routes/subscription');
+const predictionsRoutes = require('./routes/predictions');
 
 // Import resources routes (ES Module)
 let resourcesRoutes;
@@ -103,6 +104,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/crypto', cryptoRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/predictions', predictionsRoutes);
 
 // Resources routes (loaded dynamically as ES Module)
 app.use('/api/resources', (req, res, next) => {

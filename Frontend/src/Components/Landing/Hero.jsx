@@ -32,10 +32,10 @@ const Hero = () => {
               </div>
               <div className="hero_main_image_wrapper">
                 <img
-                  src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/694265bc244183114ad5d43b_DashUi.webp"
+                  src="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/69804758ea94642ffa6ead06_Screenshot%202026-02-01%20234054.png"
                   loading="lazy"
                   sizes="(max-width: 479px) 100vw, 239.97222900390625px"
-                  srcSet="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/694265bc244183114ad5d43b_DashUi.webp"
+                  srcSet="https://cdn.prod.website-files.com/69284f1f4a41d1c19de618ec/69804758ea94642ffa6ead06_Screenshot%202026-02-01%20234054.png"
                   alt="Dashboard Preview"
                   className="hero_main_image"
                 />

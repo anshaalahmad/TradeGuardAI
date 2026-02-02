@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../Components/Dashboard Pages/Navbar';
 import Sidebar from '../Components/Dashboard Pages/Sidebar';
 
-// Prediction API URL
-const PREDICTION_API_URL = 'http://140.245.22.67:5000/api/prediction';
+// Prediction API URL - proxied through AWS backend
+const PREDICTION_API_URL = '/api/predictions';
 
 // Coin prediction data
 const predictionCoins = [
@@ -60,12 +60,15 @@ export default function PredictionsPage() {
 
   // Fetch prediction data from API
   const fetchPrediction = useCallback(async () => {
+    if (!selectedCoin) return;
+    
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(PREDICTION_API_URL);
+      const response = await fetch(`${PREDICTION_API_URL}/${selectedCoin.id}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch prediction data');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch prediction data');
       }
       const data = await response.json();
       setPrediction({
@@ -88,7 +91,7 @@ export default function PredictionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedCoin]);
 
   // Initialize selected coin from URL parameter
   useEffect(() => {
