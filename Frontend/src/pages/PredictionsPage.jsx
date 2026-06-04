@@ -98,9 +98,6 @@ export default function PredictionsPage() {
     setError(null);
     try {
       let url = `${API_BASE_URL}/api/predictions/${selectedCoin.id}`;
-      if (selectedCoin.id === 'bitcoin') {
-        url = 'http://161.118.173.108:8000/api/public/bitcoin';
-      }
 
       const response = await fetch(url);
       if (!response.ok) {

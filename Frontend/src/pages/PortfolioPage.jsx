@@ -154,21 +154,7 @@ export default function PortfolioPage() {
     setIsDeleteModalOpen(true);
   };
 
-  const handleConnectMetamask = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        if (accounts.length > 0) {
-          setFormData({ ...formData, address: accounts[0] });
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Failed to connect to MetaMask');
-      }
-    } else {
-      alert('MetaMask extension is not installed. Please install it to connect natively.');
-    }
-  };
+
 
   const handleAddWallet = async (e) => {
     e.preventDefault();
@@ -504,28 +490,15 @@ export default function PortfolioPage() {
                   </div>
                   <div className="form-group mb-4">
                     <label className="text-size-small text-weight-medium mb-1 d-block">Public Address *</label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input
-                        type="text"
-                        className="main_form_input w-input"
-                        placeholder="0x..."
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        required
-                        autoComplete="off"
-                        style={{ flex: 1 }}
-                      />
-                      {formData.walletType === 'METAMASK' && (
-                        <button 
-                          type="button" 
-                          className="button is-secondary" 
-                          onClick={handleConnectMetamask}
-                          style={{ whiteSpace: 'nowrap' }}
-                        >
-                          Connect
-                        </button>
-                      )}
-                    </div>
+                    <input
+                      type="text"
+                      className="main_form_input w-input"
+                      placeholder="0x..."
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      required
+                      autoComplete="off"
+                    />
                   </div>
                 </>
               )}

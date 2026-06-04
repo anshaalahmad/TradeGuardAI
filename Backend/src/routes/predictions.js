@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 
 // Oracle prediction API endpoint (only Bitcoin supported currently)
-const ORACLE_PREDICTION_API = 'http://140.245.22.67:5000/api/prediction';
+const ORACLE_PREDICTION_API = 'http://161.118.173.108:8000/api/public/bitcoin';
 
 /**
  * @route   GET /api/predictions/:coinId
