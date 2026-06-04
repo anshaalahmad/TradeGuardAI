@@ -85,8 +85,26 @@ export const apiRequest = async (endpoint, options = {}) => {
       headers,
     });
 
-    // Handle 401 - try to refresh token
+    // Parse response first to get error details
+    const data = await response.json().catch(() => ({}));
+
+    // Handle 401 - distinguish between login failure and session expiry
     if (response.status === 401 && !options._isRetry) {
+      // If this is a login/auth endpoint, don't try to refresh - pass through the error
+      const isAuthEndpoint = endpoint.includes('/auth/login') || 
+                             endpoint.includes('/auth/register') ||
+                             endpoint.includes('/auth/google') ||
+                             endpoint.includes('/auth/forgot-password');
+      
+      if (isAuthEndpoint) {
+        // Pass through the actual error message from the backend
+        const error = new Error(data.message || data.error || 'Authentication failed');
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+
+      // For other endpoints, try to refresh the token
       const refreshed = await refreshAccessToken();
       if (refreshed) {
         // Retry the request with new token
@@ -96,9 +114,6 @@ export const apiRequest = async (endpoint, options = {}) => {
       clearTokens();
       throw new Error('Session expired. Please log in again.');
     }
-
-    // Parse response
-    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       const error = new Error(data.message || data.error || 'Request failed');

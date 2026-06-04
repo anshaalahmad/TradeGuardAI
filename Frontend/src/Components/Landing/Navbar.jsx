@@ -55,9 +55,6 @@ const Navbar = () => {
             <Link to="/resources" className="navbar_link w-nav-link" onClick={() => setIsMenuOpen(false)}>
               Resources
             </Link>
-            <Link to="/contact" className="navbar_link w-nav-link" onClick={() => setIsMenuOpen(false)}>
-              Contact
-            </Link>
             <div className="navbar_menu-buttons">
               {loading ? (
                 // Show nothing or a subtle loading indicator while checking auth

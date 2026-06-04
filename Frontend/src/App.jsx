@@ -3,9 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute, { RequireSubscription } from './Components/ProtectedRoute';
 import AdminRoute from './Components/AdminRoute';
+import ScrollToTop from './Components/ScrollToTop';
 import './css/normalize.css';
 import './css/tradeguard-ai.webflow.css';
 import './css/webflow.css';
+import './sp_styles.css';
 
 // Lazy load page components - only loaded when route is accessed
 const DashboardApp = lazy(() => import('./pages/DashboardApp'));
@@ -13,11 +15,23 @@ const PredictionsPage = lazy(() => import('./pages/PredictionsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 const ApiDashboardPage = lazy(() => import('./pages/ApiDashboardPage'));
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const LandingPage = lazy(() => import('./Components/Landing').then(m => ({ default: m.LandingPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignUpPage = lazy(() => import('./pages/SignUpPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const GoogleCallbackPage = lazy(() => import('./pages/GoogleCallbackPage'));
+
+// Static Pages - lazy loaded
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const MissionPage = lazy(() => import('./pages/MissionPage'));
+
+
+// Legal Pages - lazy loaded
+const PrivacyPolicyPage = lazy(() => import('./pages/legal').then(m => ({ default: m.PrivacyPolicyPage })));
+const TermsPage = lazy(() => import('./pages/legal').then(m => ({ default: m.TermsPage })));
+const CookiePolicyPage = lazy(() => import('./pages/legal').then(m => ({ default: m.CookiePolicyPage })));
+const DisclaimerPage = lazy(() => import('./pages/legal').then(m => ({ default: m.DisclaimerPage })));
 
 // Resources pages - lazy loaded
 const LearningPlatformPage = lazy(() => import('./pages/LearningPlatformPage'));
@@ -71,6 +85,7 @@ const PageLoader = () => (
 export default function App() {
   return (
     <Router>
+      <ScrollToTop />
       <AuthProvider>
         <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -81,6 +96,17 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/callback" element={<GoogleCallbackPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          
+          {/* Static Pages */}
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/mission" element={<MissionPage />} />
+
+          
+          {/* Legal Pages */}
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cookies" element={<CookiePolicyPage />} />
+          <Route path="/disclaimer" element={<DisclaimerPage />} />
           
           {/* Protected Routes */}
           <Route
@@ -148,6 +174,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* Portfolio page */}
+          <Route
+            path="/portfolio"
+            element={
+              <ProtectedRoute>
+                <PortfolioPage />
               </ProtectedRoute>
             }
           />

@@ -38,6 +38,7 @@ model User {
   priceAlerts       PriceAlert[]
   refreshTokens     RefreshToken[]
   subscription      Subscription?
+  wallets           Wallet[]
 
   // Sparse unique index on googleId (allows multiple nulls)
   @@index([googleId])
@@ -123,8 +124,27 @@ enum CodeType {
 }
 
 // ============================================
-// PORTFOLIO MANAGEMENT
+// PORTFOLIO MANAGEMENT & WALLETS
 // ============================================
+
+/// Connected cryptocurrency wallets and exchange accounts
+model Wallet {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  label       String?
+  walletType  String   // e.g., "BINANCE", "METAMASK"
+  address     String?  // For on-chain wallets
+  apiKey      String?  // Encrypted API key for exchanges
+  apiSecret   String?  // Encrypted API secret for exchanges
+  network     String?  // e.g., "ethereum", "bsc"
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
 
 /// User's cryptocurrency holdings
 model PortfolioHolding {

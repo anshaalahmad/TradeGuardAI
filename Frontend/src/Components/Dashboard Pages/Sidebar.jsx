@@ -146,8 +146,6 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
       setActiveLink('predictions')
     } else if (path.startsWith('/cryptocurrency')) {
       setActiveLink('cryptocurrency')
-    } else if (path.startsWith('/api-dashboard')) {
-      setActiveLink('api-dashboard')
     } else if (path.startsWith('/admin')) {
       setActiveLink('admin')
       // Auto-expand admin menu when on admin pages
@@ -194,14 +192,6 @@ export default function Sidebar({ onNavigate, activePage, isOpen = false }) {
       label: 'Predictions', 
       path: '/predictions',
       planLabel: 'Pro'
-    },
-    // API Dashboard - Shown to all users
-    {
-      id: 'api-dashboard',
-      label: 'API Dashboard',
-      path: '/api-dashboard',
-      icon: CodeIcon,
-      planLabel: 'API'
     },
     { 
       id: 'resources', 

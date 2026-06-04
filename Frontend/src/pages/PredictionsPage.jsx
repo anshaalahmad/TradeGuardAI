@@ -37,9 +37,36 @@ const predictionCoins = [
   },
 ];
 
+// Helper function to format time in PKT
+const formatTimePKT = (utcString) => {
+  if (!utcString) return '';
+  const date = new Date(utcString + (utcString.endsWith('Z') ? '' : 'Z'));
+  return date.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Karachi',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }) + ' PKT';
+};
+
+// Helper function to format date for history in PKT
+const formatDatePKT = (utcString) => {
+  if (!utcString) return '';
+  const date = new Date(utcString + (utcString.endsWith('Z') ? '' : 'Z'));
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Karachi',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 // Helper function to determine recommendation type from recommendation text
 const getRecommendationType = (recommendation) => {
   const lowerRec = recommendation?.toLowerCase() || '';
+  if (lowerRec === 'no_signal') return 'neutral';
   if (lowerRec.includes('buy') || lowerRec.includes('long')) return 'long';
   if (lowerRec.includes('sell') || lowerRec.includes('short')) return 'short';
   return 'neutral';
@@ -66,30 +93,58 @@ export default function PredictionsPage() {
   // Fetch prediction data from API
   const fetchPrediction = useCallback(async () => {
     if (!selectedCoin) return;
-    
+
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/predictions/${selectedCoin.id}`);
+      let url = `${API_BASE_URL}/api/predictions/${selectedCoin.id}`;
+      if (selectedCoin.id === 'bitcoin') {
+        url = 'http://161.118.173.108:8000/api/public/bitcoin';
+      }
+
+      const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch prediction data');
       }
+
       const data = await response.json();
-      setPrediction({
-        currentPrice: data.current_price,
-        aiConfidence: data.confidence,
-        confidenceColor: data.confidence_color,
-        recommendation: data.recommendation,
-        recommendationColor: data.rec_color,
-        recommendationType: getRecommendationType(data.recommendation),
-        entryPrice: data.entry_price,
-        takeProfit: data.take_profit,
-        stopLoss: data.stop_loss,
-        reason: data.reason,
-        nextScanAt: data.next_scan,
-        lastUpdated: data.last_updated,
-      });
+
+      if (selectedCoin.id === 'bitcoin') {
+        const signal = data.current_prediction;
+        const marketContext = data.market_context;
+        setPrediction({
+          currentPrice: `$${signal.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          aiConfidence: signal.confidence,
+          confidenceColor: signal.confidence >= 50 ? 'var(--color-green)' : (signal.confidence < 20 ? 'var(--color-red)' : '#f0ad4e'),
+          recommendation: signal.signal === 'NO_SIGNAL' ? 'Hold' : signal.signal,
+          recommendationType: signal.signal === 'NO_SIGNAL' ? 'neutral' : signal.signal.toLowerCase(),
+          orderType: signal.signal === 'NO_SIGNAL' ? 'N/A' : (signal.order_type || 'N/A'),
+          entryPrice: signal.entry_price ? `$${signal.entry_price.toLocaleString()}` : `$${signal.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          takeProfit: signal.take_profit ? `$${signal.take_profit.toLocaleString()}` : 'N/A',
+          stopLoss: signal.stop_loss ? `$${signal.stop_loss.toLocaleString()}` : 'N/A',
+          reason: signal.reason,
+          regime: marketContext ? marketContext.regime : 'N/A',
+          nextScanAt: formatTimePKT(data.next_scan_utc),
+          lastUpdated: formatTimePKT(data.last_updated_utc),
+          history: data.prediction_history || []
+        });
+      } else {
+        setPrediction({
+          currentPrice: data.current_price,
+          aiConfidence: data.confidence,
+          confidenceColor: data.confidence_color,
+          recommendation: data.recommendation,
+          recommendationColor: data.rec_color,
+          recommendationType: getRecommendationType(data.recommendation),
+          entryPrice: data.entry_price,
+          takeProfit: data.take_profit,
+          stopLoss: data.stop_loss,
+          reason: data.reason,
+          nextScanAt: data.next_scan,
+          lastUpdated: data.last_updated,
+        });
+      }
     } catch (err) {
       console.error('Error fetching prediction:', err);
       setError(err.message);
@@ -213,7 +268,7 @@ export default function PredictionsPage() {
                       {/* Click to View */}
                       {coin.available && (
                         <div className="prediction-card-footer">
-                          <span 
+                          <span
                             className="text-size-small text-weight-medium"
                             style={{ color: 'var(--base-color-brand--color-primary)' }}
                           >
@@ -230,7 +285,7 @@ export default function PredictionsPage() {
                   <div className="predictions-info-content">
                     <div className="predictions-info-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
                     <div>
@@ -238,8 +293,8 @@ export default function PredictionsPage() {
                         How AI Predictions Work
                       </div>
                       <p className="text-size-regular text-color-secondary" style={{ lineHeight: '1.6' }}>
-                        Our AI model analyzes real-time market data, technical indicators, and historical patterns 
-                        to generate trading recommendations. Predictions are updated every hour and include 
+                        Our AI model analyzes real-time market data, technical indicators, and historical patterns
+                        to generate trading recommendations. Predictions are updated every hour and include
                         confidence levels, entry points, and risk management parameters.
                       </p>
                     </div>
@@ -256,7 +311,7 @@ export default function PredictionsPage() {
                     className="button is-small is-icon"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     Back to Predictions
                   </button>
@@ -267,7 +322,7 @@ export default function PredictionsPage() {
                   <div className="card_app_wrapper" style={{ padding: '3rem', textAlign: 'center' }}>
                     <div className="prediction-loading-spinner" style={{ marginBottom: '1rem' }}>
                       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="spinning">
-                        <path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
                     <div className="text-size-medium text-color-secondary">Loading prediction data...</div>
@@ -332,14 +387,14 @@ export default function PredictionsPage() {
                             <div className="prediction-progress-bar">
                               <div
                                 className="prediction-progress-fill"
-                                style={{ 
+                                style={{
                                   width: `${prediction.aiConfidence}%`,
                                   backgroundColor: getConfidenceColor(prediction.aiConfidence, prediction.confidenceColor)
                                 }}
                               />
                             </div>
                             {/* Percentage */}
-                            <span 
+                            <span
                               className="text-size-large text-weight-semibold"
                               style={{ color: getConfidenceColor(prediction.aiConfidence, prediction.confidenceColor) }}
                             >
@@ -349,10 +404,34 @@ export default function PredictionsPage() {
                         </div>
 
                         {/* Last Updated */}
-                        <div className="prediction-last-updated">
+                        <div className="prediction-last-updated" style={{ textAlign: 'right', marginTop: '1rem', marginBottom: '1.5rem' }}>
                           <div className="text-size-tiny text-color-secondary">
-                            Last updated: {prediction.lastUpdated}
+                            Updated: {prediction.lastUpdated}
                           </div>
+                        </div>
+
+                        {/* Reason */}
+                        <div 
+                          className="prediction-reason" 
+                          style={{ 
+                            backgroundColor: 'rgba(59, 130, 246, 0.03)', 
+                            border: '1px solid rgba(59, 130, 246, 0.15)',
+                            borderLeft: '4px solid var(--base-color-brand--color-primary)', 
+                            borderRadius: '0.5rem', 
+                            padding: '1.25rem', 
+                            marginTop: 'auto',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)'
+                          }}
+                        >
+                          <div className="text-size-small text-weight-semibold" style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-color--text-primary)' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            AI Analysis Breakdown
+                          </div>
+                          <p className="text-size-regular text-color-secondary" style={{ lineHeight: 1.6, margin: 0 }}>
+                            {prediction.reason}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -360,32 +439,42 @@ export default function PredictionsPage() {
                     {/* Right Column - Recommendation */}
                     <div className="card_app_wrapper">
                       {/* Header */}
-                      <div 
+                      <div
                         className="card_app_header prediction-recommendation-header"
                         style={{
-                          backgroundColor: prediction.recommendationType === 'long' 
-                            ? 'rgba(38, 166, 154, 0.08)' 
+                          backgroundColor: prediction.recommendationType === 'long'
+                            ? 'rgba(38, 166, 154, 0.08)'
                             : prediction.recommendationType === 'short'
-                            ? 'rgba(239, 83, 80, 0.08)'
-                            : 'rgba(139, 148, 158, 0.08)',
+                              ? 'rgba(239, 83, 80, 0.08)'
+                              : 'rgba(139, 148, 158, 0.08)',
                         }}
                       >
                         <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.25rem' }}>
                           Recommendation
                         </div>
-                        <div 
+                        <div
                           className="text-size-xlarge text-weight-bold"
-                          style={{ 
+                          style={{
                             color: prediction.recommendationColor || (
-                              prediction.recommendationType === 'long' 
-                                ? 'var(--color-green)' 
+                              prediction.recommendationType === 'long'
+                                ? 'var(--color-green)'
                                 : prediction.recommendationType === 'short'
-                                ? 'var(--color-red)'
-                                : 'var(--text-color--text-primary)'
+                                  ? 'var(--color-red)'
+                                  : 'var(--text-color--text-primary)'
                             ),
                           }}
                         >
                           {prediction.recommendation}
+                        </div>
+                      </div>
+
+                      {/* Sentiment Tag */}
+                      <div className="card_app_header prediction-recommendation-header" style={{ borderTop: 'none' }}>
+                        <div className="text-size-small text-color-secondary" style={{ marginBottom: '0.25rem' }}>
+                          Sentiment Tag
+                        </div>
+                        <div className="text-size-medium text-weight-bold" style={{ color: prediction.regime === 'BEAR' ? 'var(--color-red)' : prediction.regime === 'BULL' ? 'var(--color-green)' : 'var(--text-color--text-primary)' }}>
+                          {prediction.regime}
                         </div>
                       </div>
 
@@ -399,12 +488,22 @@ export default function PredictionsPage() {
 
                           {/* Parameter Items */}
                           <div className="prediction-steps-list">
+                            {/* Order Type */}
+                            <div className="prediction-step-item">
+                              <span className="text-size-regular text-color-secondary">Order Type:</span>
+                              <span
+                                className="text-size-regular text-weight-medium"
+                                style={{ color: prediction.orderType && prediction.orderType !== 'N/A' ? 'var(--text-color--text-primary)' : 'var(--text-color--text-secondary)' }}
+                              >
+                                {prediction.orderType}
+                              </span>
+                            </div>
                             {/* Entry Price */}
                             <div className="prediction-step-item">
                               <span className="text-size-regular text-color-secondary">Entry Price:</span>
-                              <span 
+                              <span
                                 className="text-size-regular text-weight-medium"
-                                style={{ color: prediction.entryPrice !== '-' ? 'var(--color-green)' : 'var(--text-color--text-secondary)' }}
+                                style={{ color: prediction.entryPrice !== '-' && prediction.entryPrice !== 'N/A' ? 'var(--color-green)' : 'var(--text-color--text-secondary)' }}
                               >
                                 {prediction.entryPrice}
                               </span>
@@ -413,9 +512,9 @@ export default function PredictionsPage() {
                             {/* Take Profit */}
                             <div className="prediction-step-item">
                               <span className="text-size-regular text-color-secondary">Take Profit:</span>
-                              <span 
+                              <span
                                 className="text-size-regular text-weight-medium"
-                                style={{ color: prediction.takeProfit !== '-' ? 'var(--color-green)' : 'var(--text-color--text-secondary)' }}
+                                style={{ color: prediction.takeProfit !== '-' && prediction.takeProfit !== 'N/A' ? 'var(--color-green)' : 'var(--text-color--text-secondary)' }}
                               >
                                 {prediction.takeProfit}
                               </span>
@@ -424,9 +523,9 @@ export default function PredictionsPage() {
                             {/* Stop Loss */}
                             <div className="prediction-step-item">
                               <span className="text-size-regular text-color-secondary">Stop Loss:</span>
-                              <span 
+                              <span
                                 className="text-size-regular text-weight-medium"
-                                style={{ color: prediction.stopLoss !== '-' ? 'var(--color-red)' : 'var(--text-color--text-secondary)' }}
+                                style={{ color: prediction.stopLoss !== '-' && prediction.stopLoss !== 'N/A' ? 'var(--color-red)' : 'var(--text-color--text-secondary)' }}
                               >
                                 {prediction.stopLoss}
                               </span>
@@ -434,15 +533,6 @@ export default function PredictionsPage() {
                           </div>
                         </div>
 
-                        {/* Reason */}
-                        <div className="prediction-reason">
-                          <div className="text-size-small text-weight-semibold" style={{ marginBottom: '0.5rem' }}>
-                            Analysis
-                          </div>
-                          <p className="text-size-regular text-color-secondary" style={{ lineHeight: 1.5 }}>
-                            {prediction.reason}
-                          </p>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -454,7 +544,7 @@ export default function PredictionsPage() {
                     <div className="prediction-scan-info">
                       <div className="prediction-scan-icon">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="var(--base-color-brand--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
                       <div>
@@ -467,24 +557,62 @@ export default function PredictionsPage() {
                       </div>
                     </div>
 
-                    <button 
-                      onClick={fetchPrediction} 
+                    <button
+                      onClick={fetchPrediction}
                       disabled={isLoading}
                       className="button is-secondary is-small prediction-refresh-btn"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={isLoading ? 'spinning' : ''}>
-                        <path d="M1 4V10H7M23 20V14H17M20.49 9C19.9828 7.56678 19.1209 6.28535 17.9845 5.27557C16.8482 4.26579 15.4745 3.56141 13.9917 3.22617C12.509 2.89093 10.9652 2.93574 9.50481 3.35651C8.04437 3.77728 6.71475 4.56074 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4393 15.9556 20.2227 14.4952 20.6435C13.0348 21.0643 11.491 21.1091 10.0083 20.7738C8.52547 20.4386 7.1518 19.7342 6.01547 18.7244C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M1 4V10H7M23 20V14H17M20.49 9C19.9828 7.56678 19.1209 6.28535 17.9845 5.27557C16.8482 4.26579 15.4745 3.56141 13.9917 3.22617C12.509 2.89093 10.9652 2.93574 9.50481 3.35651C8.04437 3.77728 6.71475 4.56074 5.64 5.64L1 10M23 14L18.36 18.36C17.2853 19.4393 15.9556 20.2227 14.4952 20.6435C13.0348 21.0643 11.491 21.1091 10.0083 20.7738C8.52547 20.4386 7.1518 19.7342 6.01547 18.7244C4.87913 17.7146 4.01717 16.4332 3.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       {isLoading ? 'Refreshing...' : 'Refresh Prediction'}
                     </button>
                   </div>
                 )}
 
+                {/* Prediction History */}
+                {prediction && prediction.history && prediction.history.length > 0 && (
+                  <div className="card_app_wrapper" style={{ marginTop: '2rem' }}>
+                    <div className="card_app_header">
+                      <div className="text-size-medium text-weight-semibold">Prediction History</div>
+                      <div className="text-size-small text-color-secondary">Past AI signals and performance</div>
+                    </div>
+                    <div className="prediction-history-table-wrapper" style={{ overflowX: 'auto' }}>
+                      <table className="prediction-history-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color--border-primary)' }}>
+                            <th style={{ padding: '1rem', color: 'var(--text-color--text-secondary)', fontWeight: 500 }}>Time (PKT)</th>
+                            <th style={{ padding: '1rem', color: 'var(--text-color--text-secondary)', fontWeight: 500 }}>Signal</th>
+                            <th style={{ padding: '1rem', color: 'var(--text-color--text-secondary)', fontWeight: 500 }}>Price</th>
+                            <th style={{ padding: '1rem', color: 'var(--text-color--text-secondary)', fontWeight: 500 }}>Confidence</th>
+                            <th style={{ padding: '1rem', color: 'var(--text-color--text-secondary)', fontWeight: 500 }}>Regime</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {prediction.history.map((hist, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-color--border-primary)' }}>
+                              <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>{formatDatePKT(hist.timestamp)}</td>
+                              <td style={{ padding: '1rem', fontWeight: 600, color: hist.signal === 'LONG' || hist.signal === 'BUY' ? 'var(--color-green)' : hist.signal === 'SHORT' || hist.signal === 'SELL' ? 'var(--color-red)' : 'var(--text-color--text-primary)' }}>
+                                {hist.signal === 'NO_SIGNAL' ? 'HOLD' : hist.signal}
+                              </td>
+                              <td style={{ padding: '1rem' }}>${hist.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '1rem', color: getConfidenceColor(hist.confidence, null) }}>{hist.confidence}%</td>
+                              <td style={{ padding: '1rem', color: hist.regime === 'BEAR' ? 'var(--color-red)' : hist.regime === 'BULL' ? 'var(--color-green)' : 'var(--text-color--text-primary)' }}>
+                                {hist.regime}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 {/* Disclaimer */}
                 <div className="prediction-disclaimer">
                   <p className="text-size-small text-color-secondary" style={{ lineHeight: 1.5 }}>
-                    <strong>⚠️ Disclaimer:</strong> AI predictions are for informational purposes only and 
-                    do not constitute financial advice. Always conduct your own research and consider your 
+                    <strong>⚠️ Disclaimer:</strong> AI predictions are for informational purposes only and
+                    do not constitute financial advice. Always conduct your own research and consider your
                     risk tolerance before making trading decisions. Past performance does not guarantee future results.
                   </p>
                 </div>

@@ -18,6 +18,7 @@ const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const subscriptionRoutes = require('./routes/subscription');
 const predictionsRoutes = require('./routes/predictions');
+const walletRoutes = require('./routes/wallet');
 
 // Import resources routes (ES Module)
 let resourcesRoutes;
@@ -47,9 +48,30 @@ configurePassport();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+// CORS configuration - supports both local development and production
+const allowedOrigins = [
+  process.env.FRONTEND_URL, // Production domain or configured URL
+  'http://localhost:5173',  // Local frontend development
+  'http://localhost:3000',  // Alternative local port
+].filter(Boolean); // Remove undefined/null values
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In production, only allow configured origins
+      // In development, be more permissive
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Email', 'X-Admin-Id']
@@ -105,6 +127,7 @@ app.use('/api/crypto', cryptoRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/predictions', predictionsRoutes);
+app.use('/api/wallets', walletRoutes);
 
 // Logo proxy route - fetches crypto logos from Logo.dev
 app.get('/api/logo/:symbol', async (req, res) => {

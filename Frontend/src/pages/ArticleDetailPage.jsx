@@ -111,7 +111,7 @@ const RelatedArticleCard = ({ article, onClick }) => (
     <div className="related-article-card__content">
       <h4>{article.title}</h4>
       <span className="related-article-card__meta">
-        {article.readTime} min read · {article.difficulty}
+        {article.readTime} min read
       </span>
     </div>
   </div>
@@ -330,7 +330,6 @@ export default function ArticleDetailPage() {
                   {/* Header */}
                   <header className="article-detail__header">
                     <div className="article-detail__meta">
-                      <DifficultyBadge difficulty={article.difficulty} />
                       <span className="article-detail__category">{article.category?.replace('-', ' ')}</span>
                       <span className="article-detail__read-time">{article.readTime} min read</span>
                       <span className="article-detail__views">{article.viewCount || 0} views</span>

@@ -25,9 +25,6 @@ const Hero = () => {
                   <Link to="/app" className="button w-button">
                     Get Started
                   </Link>
-                  <Link to="/contact" className="button is-secondary w-button">
-                    Contact Us
-                  </Link>
                 </div>
               </div>
               <div 

@@ -16,13 +16,32 @@ const getApiBaseUrl = () => {
 };
 const API_BASE_URL = getApiBaseUrl()
 
-// Category configuration with display names and colors
+// Category configuration with display names, colors, and icons
 const CATEGORIES = [
-  { id: 'all', label: 'All Articles', color: '#1e65fa' },
-  { id: 'beginner', label: 'Beginner', color: '#26a69a' },
-  { id: 'technical-analysis', label: 'Technical Analysis', color: '#7c3aed' },
-  { id: 'trading-strategies', label: 'Trading Strategies', color: '#f59e0b' },
-  { id: 'market-analysis', label: 'Market Analysis', color: '#ef5350' }
+  { id: 'all', label: 'All Articles', color: '#1e65fa', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+  )},
+  { id: 'Getting Started', label: 'Getting Started', color: '#10b981', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+  )},
+  { id: 'Trading Basics', label: 'Trading Basics', color: '#3b82f6', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+  )},
+  { id: 'Technical Analysis', label: 'Technical Analysis', color: '#7c3aed', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+  )},
+  { id: 'Risk Management', label: 'Risk Management', color: '#ef4444', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+  )},
+  { id: 'Market Psychology', label: 'Market Psychology', color: '#f59e0b', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+  )},
+  { id: 'Advanced Strategies', label: 'Advanced Strategies', color: '#8b5cf6', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+  )},
+  { id: 'News & Updates', label: 'News & Updates', color: '#06b6d4', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+  )}
 ]
 
 // Difficulty badge component
@@ -132,7 +151,6 @@ const ArticleCard = ({ article, isBookmarked, onBookmarkToggle, bookmarkLoading,
           ))}
         </div>
         <div className="article-card__actions">
-          <DifficultyBadge difficulty={article.difficulty} />
           <BookmarkButton 
             isBookmarked={isBookmarked} 
             onToggle={onBookmarkToggle}
@@ -357,12 +375,14 @@ export default function LearningPlatformPage() {
                   key={category.id}
                   onClick={() => handleCategoryChange(category.id)}
                   className={`category-tab ${activeCategory === category.id ? 'is-active' : ''}`}
-                  style={activeCategory === category.id ? { 
-                    borderColor: category.color,
-                    color: category.color
-                  } : {}}
+                  style={{
+                    '--tab-color': category.color,
+                    '--tab-bg': `${category.color}10`,
+                    '--tab-bg-hover': `${category.color}18`
+                  }}
                 >
-                  {category.label}
+                  <span className="category-tab__icon">{category.icon}</span>
+                  <span className="category-tab__label">{category.label}</span>
                 </button>
               ))}
             </div>

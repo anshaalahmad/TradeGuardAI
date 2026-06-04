@@ -2,111 +2,126 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
+  const currentYear = new Date().getFullYear();
+
+  const socialLinks = [
+    {
+      name: 'Twitter',
+      url: 'https://twitter.com/tradeguardai',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      ),
+    },
+    {
+      name: 'LinkedIn',
+      url: 'https://linkedin.com/company/tradeguardai',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+        </svg>
+      ),
+    },
+    {
+      name: 'Discord',
+      url: 'https://discord.gg/tradeguardai',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
+        </svg>
+      ),
+    },
+  ];
+
+  const columns = [
+    {
+      title: 'Product',
+      links: [
+        { label: 'Pricing', to: '/pricing' },
+        { label: 'Dashboard', to: '/app' },
+        { label: 'AI Predictions', to: '/predictions' },
+        { label: 'API Access', to: '/pricing', badge: 'Coming Soon' },
+      ],
+    },
+    {
+      title: 'Company',
+      links: [
+        { label: 'About Us', to: '/about' },
+        { label: 'Our Mission', to: '/mission' },
+      ],
+    },
+    {
+      title: 'Resources',
+      links: [
+        { label: 'Learning Hub', to: '/resources/learning' },
+        { label: 'Chart Patterns', to: '/resources/patterns' },
+      ],
+    },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Privacy Policy', to: '/privacy' },
+        { label: 'Terms of Service', to: '/terms' },
+        { label: 'Cookie Policy', to: '/cookies' },
+        { label: 'Disclaimer', to: '/disclaimer' },
+      ],
+    },
+  ];
+
   return (
-    <div className="footer_main_wrapper">
+    <footer className="site-footer">
       <div className="container-large">
-        <div className="footer_wrap_component">
-          <div className="footer_top">
-            <div className="footer_links-wrap">
-              <div className="footer_title">Job seekers</div>
-              <Link to="/jobs" className="footer_link">
-                Find jobs
-              </Link>
-              <Link to="/resume" className="footer_link">
-                Upload resume
-              </Link>
-              <Link to="/alerts" className="footer_link">
-                Job alerts
-              </Link>
-              <Link to="/resources" className="footer_link">
-                Career resources
-              </Link>
-              <Link to="/support" className="footer_link">
-                Support &amp; help
-              </Link>
-            </div>
-            <div className="footer_links-wrap">
-              <div className="footer_title">Employers</div>
-              <Link to="/post-job" className="footer_link">
-                Post a job
-              </Link>
-              <Link to="/talent" className="footer_link">
-                Find talent
-              </Link>
-              <Link to="/solutions" className="footer_link">
-                Hiring solutions
-              </Link>
-              <Link to="/employer-support" className="footer_link">
-                Employer support
-              </Link>
-            </div>
-            <div className="footer_links-wrap">
-              <div className="footer_title">Company</div>
-              <Link to="/about" className="footer_link">
-                About us
-              </Link>
-              <Link to="/success" className="footer_link">
-                Success stories
-              </Link>
-              <Link to="/mission" className="footer_link">
-                Our mission
-              </Link>
-              <Link to="/blog" className="footer_link">
-                Blog
-                <br />
-              </Link>
-            </div>
-            <div className="footer_links-wrap hide-tablet">
-              <div className="footer_title">Community</div>
-              <Link to="/announcements" className="footer_link">
-                Announcements
-              </Link>
-              <Link to="/podcast" className="footer_link">
-                Business podcast
-              </Link>
-              <Link to="/discussions" className="footer_link">
-                Career discussions
-              </Link>
-            </div>
-            <div className="footer_links-wrap">
-              <div className="footer_title">Support</div>
-              <Link to="/help" className="footer_link">
-                Help center
-              </Link>
-              <Link to="/faq" className="footer_link">
-                FAQs
-              </Link>
-              <Link to="/contact" className="footer_link">
-                Contact us
-              </Link>
+        {/* Top: brand + link columns */}
+        <div className="footer-top-grid">
+          {/* Brand column */}
+          <div className="footer-brand-col">
+            <Link to="/" className="footer-brand-link">
+              <span className="footer-brand-name">TradeGuard AI</span>
+            </Link>
+            <p className="footer-brand-tagline text-color-secondary">
+              The next generation of intelligent crypto trading.
+            </p>
+            <div className="footer-social-row">
+              {socialLinks.map((social) => (
+                <a
+                  key={social.name}
+                  href={social.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-social-btn"
+                  aria-label={social.name}
+                >
+                  {social.icon}
+                </a>
+              ))}
             </div>
           </div>
-          <div className="footer_bottom">
-            <div className="footer_brand">
-              <div className="text-size-small text-align-center">TradeguardAI</div>
+
+          {/* Link columns */}
+          {columns.map((col) => (
+            <div key={col.title} className="footer-link-col">
+              <div className="footer-col-title">{col.title}</div>
+              {col.links.map((link) => (
+                <Link key={link.label} to={link.to} className="footer-nav-link">
+                  {link.label}
+                  {link.badge && (
+                    <span className="footer-badge">{link.badge}</span>
+                  )}
+                </Link>
+              ))}
             </div>
-            <div className="footer_bottom-mid">
-              <Link to="/terms" className="footer_link">
-                Terms
-              </Link>
-              <Link to="/sitemap" className="footer_link">
-                Site map
-              </Link>
-              <Link to="/privacy" className="footer_link">
-                Privacy
-              </Link>
-              <Link to="/legal" className="footer_link">
-                Legal
-              </Link>
-              <Link to="/cookies" className="footer_link">
-                Cookies
-              </Link>
-            </div>
-            <div className="text-size-small text-align-center">© 2025 TradeGuardAI. All rights reserved.</div>
+          ))}
+        </div>
+
+        {/* Bottom bar */}
+        <div className="footer-bottom-bar">
+          <div className="footer-copyright text-color-secondary">
+            © {currentYear} TradeGuard AI, Inc. All rights reserved.
           </div>
         </div>
       </div>
-    </div>
+    </footer>
   );
 };
 

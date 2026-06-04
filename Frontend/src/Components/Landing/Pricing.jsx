@@ -62,6 +62,7 @@ const Pricing = ({ showSuccessMessage = false, showCancelMessage = false }) => {
       isPremium: false,
       buttonText: 'Get API Access',
       tier: 'API_PLAN',
+      comingSoon: true,
     },
   ];
 
@@ -99,6 +100,9 @@ const Pricing = ({ showSuccessMessage = false, showCancelMessage = false }) => {
   }, [isAuthenticated, navigate, activeTab, hasTier]);
 
   const getButtonText = (plan) => {
+    if (plan.comingSoon) {
+      return 'Coming Soon';
+    }
     if (!isAuthenticated) {
       return plan.tier === 'FREE' ? 'Sign Up Free' : plan.buttonText;
     }
@@ -117,6 +121,7 @@ const Pricing = ({ showSuccessMessage = false, showCancelMessage = false }) => {
   };
 
   const isButtonDisabled = (plan) => {
+    if (plan.comingSoon) return true;
     if (!isAuthenticated) return false;
     if (loadingPlan === plan.id) return true;
     
@@ -250,6 +255,20 @@ const Pricing = ({ showSuccessMessage = false, showCancelMessage = false }) => {
                             )}
                             <div className={`pricing_card-title ${plan.isPremium ? 'mid' : ''}`}>
                               {plan.name}
+                              {plan.comingSoon && (
+                                <span style={{
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '1rem',
+                                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                                  color: '#f59e0b',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  marginLeft: '0.5rem',
+                                  verticalAlign: 'middle',
+                                }}>Coming Soon</span>
+                              )}
                             </div>
                             <div className={`pricing_checklist ${plan.isPremium ? 'mid' : ''}`}>
                               {plan.features.map((feature, idx) => (
@@ -327,6 +346,20 @@ const Pricing = ({ showSuccessMessage = false, showCancelMessage = false }) => {
                             )}
                             <div className={`pricing_card-title ${plan.isPremium ? 'mid' : ''}`}>
                               {plan.name}
+                              {plan.comingSoon && (
+                                <span style={{
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '1rem',
+                                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                                  color: '#f59e0b',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  marginLeft: '0.5rem',
+                                  verticalAlign: 'middle',
+                                }}>Coming Soon</span>
+                              )}
                             </div>
                             <div className={`pricing_checklist ${plan.isPremium ? 'mid' : ''}`}>
                               {plan.features.map((feature, idx) => (

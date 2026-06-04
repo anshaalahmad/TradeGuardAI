@@ -1,10 +1,15 @@
 import React, { useEffect } from 'react';
 import Navbar from './Navbar';
 import Hero from './Hero';
+import LogoSection from './LogoSection';
 import Features from './Features';
+import HowItWorks from './HowItWorks';
+import Testimonials from './Testimonials';
 import Pricing from './Pricing';
 import FAQ from './FAQ';
 import Footer from './Footer';
+import { SEOHead } from '../SEO';
+import { BackToTop } from '../UI';
 
 const LandingPage = () => {
   useEffect(() => {
@@ -20,6 +25,12 @@ const LandingPage = () => {
 
   return (
     <div className="page-wrapper">
+      <SEOHead
+        title={null}
+        description="Trade smarter with AI-powered predictions, real-time market analysis, and intelligent alerts. Join 10,000+ traders using TradeGuard AI for cryptocurrency trading."
+        canonical="/"
+        keywords="crypto trading, AI trading, cryptocurrency, bitcoin, ethereum, trading platform, market analysis, trading predictions, crypto alerts, TradeGuard"
+      />
       {/* Global Styles */}
       <div className="global-styles w-embed">
         <style dangerouslySetInnerHTML={{
@@ -178,11 +189,15 @@ const LandingPage = () => {
       <Navbar />
       <div className="main-wrapper">
         <Hero />
+        <LogoSection />
         <Features />
+        <HowItWorks />
         <Pricing />
+        <Testimonials />
         <FAQ />
         <Footer />
       </div>
+      <BackToTop />
     </div>
   );
 };

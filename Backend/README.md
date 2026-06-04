@@ -8,9 +8,9 @@ Backend API server for the TradeGuardAI cryptocurrency trading platform.
 - **Framework**: Express.js
 - **Database**: MongoDB Atlas with Prisma ORM
 - **Caching**: In-memory (node-cache) - Redis ready for production
-- **Authentication**: Handled by Memberstack (frontend)
+- **Authentication**: JWT + Google OAuth 2.0 via Passport.js
 
-## Getting Started
+## Local Development Setup
 
 ### Prerequisites
 
@@ -18,7 +18,7 @@ Backend API server for the TradeGuardAI cryptocurrency trading platform.
 - MongoDB Atlas account (free tier available)
 - npm or yarn
 
-### Installation
+### Quick Start
 
 1. **Install dependencies**
    ```bash
@@ -29,25 +29,44 @@ Backend API server for the TradeGuardAI cryptocurrency trading platform.
 2. **Configure environment**
    ```bash
    cp .env.example .env
-   # Edit .env with your settings
+   # Edit .env with your values (see below)
    ```
 
-3. **Setup database** (optional for MVP)
+3. **Generate Prisma client**
    ```bash
    npm run db:generate
-   npm run db:push
    ```
 
-4. **Start the server**
+4. **Start the development server**
    ```bash
-   # Development with hot-reload
    npm run dev
-
-   # Production
-   npm start
    ```
 
 The server will start at `http://localhost:5000`
+
+### Google OAuth Setup (Local Development)
+
+To enable Google OAuth login locally, you need to add the local callback URL to your Google Console:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Select your OAuth 2.0 Client ID
+3. Under "Authorized redirect URIs", add:
+   - `http://localhost:5173/auth/google/callback` (local development)
+   - Keep your production URL as well (e.g., `https://tradeguardai.app/auth/google/callback`)
+4. Save changes
+
+**Note**: You can use the same `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for both local and production environments. Google allows multiple redirect URIs per OAuth client.
+
+### Running Alongside Production
+
+The local backend runs independently from the AWS production server:
+
+- **Local Backend**: `http://localhost:5000` (your machine)
+- **Production Backend**: `https://tradeguardai.app/api` (AWS server)
+
+Both use the same MongoDB Atlas database, so data is shared. The CORS configuration allows requests from both:
+- `http://localhost:5173` (local frontend)
+- Production domain configured in `FRONTEND_URL`
 
 ## API Endpoints
 
