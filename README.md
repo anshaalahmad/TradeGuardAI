@@ -43,19 +43,11 @@
 - Market summary with Fear & Greed Index
 - Interactive candlestick charts with TradingView-style UI
 - Order book visualization
-- Multiple timeframe support (1m, 5m, 15m, 1h, 4h, 1D)
-
-### 📈 Chart Pattern Analysis
-- Comprehensive chart pattern library
-- Bullish, bearish, and continuation patterns
-- Visual examples and trading strategies
-- Success rate statistics
 
 ### 🤖 AI-Powered Predictions
 - Machine learning price predictions
 - Confidence scoring
 - Historical accuracy tracking
-- Multiple cryptocurrency support
 
 ### 📚 Learning Platform
 - Educational articles and guides
@@ -67,12 +59,10 @@
 - Secure authentication (Email/Password + Google OAuth)
 - User profiles and preferences
 - Watchlist management
-- Price alerts
 
 ### 💳 Subscription Tiers
 - **Free**: Basic market data access
 - **Pro**: Advanced features + AI predictions
-- **API Plan**: Full API access for developers
 
 ### 🛡️ Admin Dashboard
 - User management
